@@ -1,0 +1,62 @@
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
+@@ -18,6 +18,7 @@
+                 <action android:name="android.intent.action.VIEW" />
+                 <action android:name="android.intent.action.EDIT" />
+                 <category android:name="android.intent.category.DEFAULT" />
++                <category android:name="android.intent.category.BROWSABLE" />
+                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                 <data android:mimeType="text/csv" />
+@@ -26,6 +27,10 @@
+                 <data android:mimeType="text/plain" />
+                 <data android:mimeType="text/markdown" />
+                 <data android:mimeType="application/zip" />
++                <data android:mimeType="application/x-zip-compressed" />
++                <data android:mimeType="application/octet-stream" />
++                <data android:mimeType="application/x-sdocx" />
++                <data android:mimeType="application/vnd.samsung.sdocx" />
+             </intent-filter>
+         </activity>
+     </application>
+--- a/app/src/main/java/com/openlocal/office/MainActivity.java
++++ b/app/src/main/java/com/openlocal/office/MainActivity.java
+@@ -137,6 +137,7 @@
+                 }
+                 if (bytes.length > MAX_FILE_BYTES) throw new IOException("File is larger than 40 MB.");
+                 String type = detectType(uri, name);
++                if (type.isEmpty() && looksLikeSdocx(bytes)) type = "sdocx";
+                 String json;
+                 xlsx = null; csv = null; docx = null; textDocument = null; rawDocument = null;
+                 if ("xlsx".equals(type)) {
+@@ -340,6 +341,21 @@
+     private void js(String code) { web.evaluateJavascript(code, null); }
+     private static String q(String s){ if(s==null)return "null";StringBuilder b=new StringBuilder("\"");for(int i=0;i<s.length();i++){char c=s.charAt(i);switch(c){case '\\':b.append("\\\\");break;case '"':b.append("\\\"");break;case '\n':b.append("\\n");break;case '\r':b.append("\\r");break;case '\t':b.append("\\t");break;default:if(c<32)b.append(String.format("\\u%04x",(int)c));else b.append(c);}}return b.append('"').toString();}
+     private String displayName(Uri uri){String n=null;try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())n=c.getString(0);}catch(Exception ignored){}if(n==null||n.trim().isEmpty())n=uri.getLastPathSegment();return n==null||n.trim().isEmpty()?"document":n;}
++    private boolean looksLikeSdocx(byte[] bytes){
++        if(bytes==null||bytes.length<4||bytes[0]!=0x50||bytes[1]!=0x4b)return false;
++        boolean note=false,pages=false;
++        try(java.util.zip.ZipInputStream zin=new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(bytes))){
++            java.util.zip.ZipEntry e; int seen=0;
++            while((e=zin.getNextEntry())!=null&&seen++<4096){
++                String n=e.getName();
++                if("note.note".equals(n))note=true;
++                else if("pageIdInfo.dat".equals(n))pages=true;
++                if(note&&pages)return true;
++            }
++        }catch(Exception ignored){}
++        return false;
++    }
++
+     private String detectType(Uri uri,String name){
+         String ext=extension(name);
+         if("xlsx".equals(ext)||"csv".equals(ext)||"docx".equals(ext)||"txt".equals(ext)||"md".equals(ext)||"markdown".equals(ext)||"sdocx".equals(ext)||"xls".equals(ext))return ext;
+@@ -349,7 +365,7 @@
+         if("text/csv".equals(m)||"text/comma-separated-values".equals(m)||"application/csv".equals(m))return "csv";
+         if("text/markdown".equals(m))return "md";
+         if("text/plain".equals(m))return "txt";
+-        if("application/zip".equals(m)&&name!=null&&name.toLowerCase(Locale.ROOT).endsWith(".sdocx"))return "sdocx";
++        if(("application/zip".equals(m)||"application/x-zip-compressed".equals(m)||"application/octet-stream".equals(m)||"application/x-sdocx".equals(m)||"application/vnd.samsung.sdocx".equals(m))&&name!=null&&name.toLowerCase(Locale.ROOT).endsWith(".sdocx"))return "sdocx";
+         return "";
+     }
+     private long displaySize(Uri uri){try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.SIZE},null,null,null)){if(c!=null&&c.moveToFirst()&&!c.isNull(0))return c.getLong(0);}catch(Exception ignored){}return -1;}
