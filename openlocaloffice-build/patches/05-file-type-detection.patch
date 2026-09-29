@@ -1,0 +1,6 @@
+--- a/app/src/main/java/com/openlocal/office/MainActivity.java
++++ b/app/src/main/java/com/openlocal/office/MainActivity.java
+@@ -215,1 +215,2 @@
+-    private String displayName(Uri uri){String n=null;try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())n=c.getString(0);}catch(Exception ignored){}return n==null?"document":n;}
++    private String displayName(Uri uri){String n=null;try(Cursor c=getContentResolver().query(uri,new String[]{OpenableColumns.DISPLAY_NAME},null,null,null)){if(c!=null&&c.moveToFirst())n=c.getString(0);}catch(Exception ignored){}if(n==null||n.trim().isEmpty())n=uri.getLastPathSegment();return n==null||n.trim().isEmpty()?"document":n;}
++    private String detectType(Uri uri,String name){String ext=extension(name);if(!ext.isEmpty())return ext;String m=null;try{m=getContentResolver().getType(uri);}catch(Exception ignored){}if("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(m))return "xlsx";if("application/vnd.openxmlformats-officedocument.wordprocessingml.document".equals(m))return "docx";if("text/csv".equals(m)||"text/comma-separated-values".equals(m)||"application/csv".equals(m))return "csv";return "";}
