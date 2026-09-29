@@ -1,0 +1,37 @@
+--- a/scripts/check-android-java.sh
++++ b/scripts/check-android-java.sh
+@@ -7,7 +7,7 @@
+ package android.os; public class Bundle {}
+ J
+ cat > "$TMP/stubs/android/net/Uri.java" <<'J'
+-package android.net; public class Uri { public static Uri parse(String s){return new Uri();} public String toString(){return "";} }
++package android.net; public class Uri { public static Uri parse(String s){return new Uri();} public String toString(){return "";} public String getLastPathSegment(){return "file.xlsx";} }
+ J
+ cat > "$TMP/stubs/android/database/Cursor.java" <<'J'
+ package android.database; public interface Cursor extends AutoCloseable { boolean moveToFirst(); String getString(int i); long getLong(int i); boolean isNull(int i); void close(); }
+@@ -16,13 +16,13 @@
+ package android.content; public interface SharedPreferences { String getString(String k,String d); Editor edit(); interface Editor { Editor putString(String k,String v); Editor clear(); void apply(); } }
+ J
+ cat > "$TMP/stubs/android/content/ContentResolver.java" <<'J'
+-package android.content; import android.net.Uri; import android.database.Cursor; import java.io.*; public class ContentResolver { public Cursor query(Uri u,String[] p,String s,String[] a,String o){return null;} public InputStream openInputStream(Uri u)throws FileNotFoundException{return null;} public OutputStream openOutputStream(Uri u,String m)throws FileNotFoundException{return null;} public void takePersistableUriPermission(Uri u,int f){} }
++package android.content; import android.net.Uri; import android.database.Cursor; import java.io.*; public class ContentResolver { public Cursor query(Uri u,String[] p,String s,String[] a,String o){return null;} public InputStream openInputStream(Uri u)throws FileNotFoundException{return null;} public OutputStream openOutputStream(Uri u,String m)throws FileNotFoundException{return null;} public void takePersistableUriPermission(Uri u,int f){} public String getType(Uri u){return null;} }
+ J
+ cat > "$TMP/stubs/android/content/Intent.java" <<'J'
+-package android.content; import android.net.Uri; public class Intent { public static final String ACTION_OPEN_DOCUMENT="", ACTION_CREATE_DOCUMENT="", CATEGORY_OPENABLE="", EXTRA_MIME_TYPES="", EXTRA_TITLE=""; public static final int FLAG_GRANT_READ_URI_PERMISSION=1, FLAG_GRANT_WRITE_URI_PERMISSION=2, FLAG_GRANT_PERSISTABLE_URI_PERMISSION=4; public Intent(String a){} public Intent addCategory(String c){return this;} public Intent setType(String t){return this;} public Intent putExtra(String k,Object v){return this;} public Intent addFlags(int f){return this;} public Uri getData(){return null;} public int getFlags(){return 0;} }
++package android.content; import android.net.Uri; public class Intent { public static final String ACTION_OPEN_DOCUMENT="", ACTION_CREATE_DOCUMENT="", ACTION_VIEW="VIEW", ACTION_EDIT="EDIT", CATEGORY_OPENABLE="", EXTRA_MIME_TYPES="", EXTRA_TITLE=""; public static final int FLAG_GRANT_READ_URI_PERMISSION=1, FLAG_GRANT_WRITE_URI_PERMISSION=2, FLAG_GRANT_PERSISTABLE_URI_PERMISSION=4; public Intent(String a){} public Intent addCategory(String c){return this;} public Intent setType(String t){return this;} public Intent putExtra(String k,Object v){return this;} public Intent addFlags(int f){return this;} public Uri getData(){return null;} public int getFlags(){return 0;} public String getAction(){return null;} }
+ J
+ cat > "$TMP/stubs/android/app/Activity.java" <<'J'
+-package android.app; import android.os.Bundle; import android.content.*; public class Activity { public static final int RESULT_OK=-1, MODE_PRIVATE=0; protected void onCreate(Bundle b){} protected void onDestroy(){} protected void onActivityResult(int r,int c,Intent d){} public void setContentView(Object o){} public ContentResolver getContentResolver(){return new ContentResolver();} public void startActivityForResult(Intent i,int r){} public void runOnUiThread(Runnable r){r.run();} public SharedPreferences getSharedPreferences(String n,int m){return null;} }
++package android.app; import android.os.Bundle; import android.content.*; public class Activity { public static final int RESULT_OK=-1, MODE_PRIVATE=0; protected void onCreate(Bundle b){} protected void onDestroy(){} protected void onNewIntent(Intent i){} protected void onActivityResult(int r,int c,Intent d){} public void setContentView(Object o){} public ContentResolver getContentResolver(){return new ContentResolver();} public void startActivityForResult(Intent i,int r){} public void runOnUiThread(Runnable r){r.run();} public SharedPreferences getSharedPreferences(String n,int m){return null;} public Intent getIntent(){return new Intent("");} public void setIntent(Intent i){} }
+ J
+ cat > "$TMP/stubs/android/provider/OpenableColumns.java" <<'J'
+ package android.provider; public class OpenableColumns { public static final String DISPLAY_NAME="", SIZE=""; }
+@@ -37,7 +37,7 @@
+ package android.webkit; import android.net.Uri; public interface WebResourceRequest { Uri getUrl(); }
+ J
+ cat > "$TMP/stubs/android/webkit/WebViewClient.java" <<'J'
+-package android.webkit; public class WebViewClient { public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return false;} }
++package android.webkit; public class WebViewClient { public boolean shouldOverrideUrlLoading(WebView v,WebResourceRequest r){return false;} public void onPageFinished(WebView v,String url){} }
+ J
+ cat > "$TMP/stubs/android/webkit/WebView.java" <<'J'
+ package android.webkit; import android.app.Activity; public class WebView { public WebView(Activity a){} public WebSettings getSettings(){return new WebSettings();} public void addJavascriptInterface(Object o,String n){} public void setWebViewClient(WebViewClient c){} public void loadUrl(String u){} public void evaluateJavascript(String s,Object cb){} public void destroy(){} }
