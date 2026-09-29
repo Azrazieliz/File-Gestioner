@@ -1,0 +1,57 @@
+--- a/app/src/test/java/com/openlocal/office/core/OfficeCoreTest.java
++++ b/app/src/test/java/com/openlocal/office/core/OfficeCoreTest.java
+@@ -9,10 +9,11 @@
+   public static void main(String[] args) throws Exception {
+     testCsvQuotedRoundTrip();
+     testXlsxEditPreservesPackage();
++    testXlsxLargeGridLookupCompletesQuickly();
+     testDocxEditPreservesMediaAndTable();
+     testZipInflationLimit();
+     testOfficeValidatorRejectsCorruptOutput();
+-    System.out.println("OfficeCoreTest: 5/5 PASS");
++    System.out.println("OfficeCoreTest: 6/6 PASS");
+   }
+ 
+   static void testCsvQuotedRoundTrip() throws Exception {
+@@ -44,6 +45,41 @@
+     eq("=1+2", reopened.getEditValue(0,0,1), "XLSX untouched formula preserved");
+   }
+ 
++  static void testXlsxLargeGridLookupCompletesQuickly() throws Exception {
++    byte[] bytes = makeLargeXlsx(300, 60);
++    XlsxSession wb = XlsxSession.open(bytes);
++    long start = System.nanoTime();
++    long checksum = 0;
++    for (int r = 0; r < 300; r++) {
++      for (int c = 0; c < 60; c++) checksum += wb.getEditValue(0, r, c).length();
++    }
++    long elapsedMs = (System.nanoTime() - start) / 1_000_000L;
++    if (checksum == 0) fail("Large XLSX lookup returned no data");
++    if (elapsedMs > 3000) fail("Large XLSX cell lookup is too slow: " + elapsedMs + " ms");
++  }
++
++  static byte[] makeLargeXlsx(int rows, int cols) throws Exception {
++    LinkedHashMap<String,String> entries = new LinkedHashMap<>();
++    entries.put("[Content_Types].xml", "<?xml version=\"1.0\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"xml\" ContentType=\"application/xml\"/></Types>");
++    entries.put("xl/workbook.xml", "<?xml version=\"1.0\"?><workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"Large\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>");
++    entries.put("xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\"?><Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Target=\"worksheets/sheet1.xml\"/></Relationships>");
++    StringBuilder sh = new StringBuilder("<?xml version=\"1.0\"?><worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetData>");
++    for (int r = 0; r < rows; r++) {
++      sh.append("<row r=\"").append(r+1).append("\">");
++      for (int c = 0; c < cols; c++) sh.append("<c r=\"").append(cellRefForTest(r,c)).append("\"><v>").append(r*cols+c).append("</v></c>");
++      sh.append("</row>");
++    }
++    sh.append("</sheetData></worksheet>");
++    entries.put("xl/worksheets/sheet1.xml", sh.toString());
++    return zip(entries, Collections.emptyMap());
++  }
++
++  static String cellRefForTest(int row, int col) {
++    StringBuilder b = new StringBuilder(); int c = col + 1;
++    while (c > 0) { int rem = (c - 1) % 26; b.append((char)('A' + rem)); c = (c - 1) / 26; }
++    return b.reverse().append(row + 1).toString();
++  }
++
+   static void testDocxEditPreservesMediaAndTable() throws Exception {
+     byte[] bytes = makeDocx();
+     DocxSession doc = DocxSession.open(bytes);
