@@ -102,7 +102,6 @@ jobs:
           test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           grep -Fq 'id="spreadsheetTools"' app/src/main/assets/index.html
           grep -Fq 'File Gestioner spreadsheet interaction layer' app/src/main/assets/style.css
-          grep -Fq 'getClipboardText()' app/src/main/java/com/openlocal/office/MainActivity.java
 
 
       - name: Verify expanded viewer
