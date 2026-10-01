@@ -65,6 +65,8 @@ jobs:
           python3 ../hotfixes/apply-picker-fallback.py
           python3 ../hotfixes/apply-webview-sdocx-runtime.py
           python3 ../hotfixes/apply-sdocx-continuous-editor.py
+          python3 ../hotfixes/apply-mobile-spreadsheet-ui.py
+          python3 ../hotfixes/apply-pro-app-branding.py
           node --check app/src/main/assets/app.js
           grep -q 'getSheetWindow' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -q 'search(String needle' app/src/main/java/com/openlocal/office/core/XlsxSession.java
