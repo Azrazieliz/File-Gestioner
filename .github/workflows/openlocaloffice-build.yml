@@ -93,7 +93,12 @@ jobs:
           assert '"*/*"' in body
           assert 'EXTRA_MIME_TYPES' not in body
           PY
-          grep -q 'Search the whole document' app/src/main/assets/index.html\n          grep -Fq 'File Gestioner' app/src/main/assets/index.html\n          grep -Fq 'File Gestioner pro UI polish' app/src/main/assets/style.css\n          grep -Fq 'OpenLocalOffice mobile spreadsheet UI hotfix' app/src/main/assets/style.css\n          grep -Fq 'android:icon=\"@mipmap/ic_launcher\"' app/src/main/AndroidManifest.xml\n          test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          grep -q 'Search the whole document' app/src/main/assets/index.html
+          grep -Fq 'File Gestioner' app/src/main/assets/index.html
+          grep -Fq 'File Gestioner pro UI polish' app/src/main/assets/style.css
+          grep -Fq 'OpenLocalOffice mobile spreadsheet UI hotfix' app/src/main/assets/style.css
+          grep -Fq 'android:icon="@mipmap/ic_launcher"' app/src/main/AndroidManifest.xml
+          test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 
 
       - name: Verify expanded viewer
