@@ -1,289 +1,68 @@
 from pathlib import Path
 
-INDEX = Path('app/src/main/assets/index.html')
-CSS = Path('app/src/main/assets/style.css')
-APP = Path('app/src/main/assets/app.js')
-MAIN = Path('app/src/main/java/com/openlocal/office/MainActivity.java')
+I=Path('app/src/main/assets/index.html'); C=Path('app/src/main/assets/style.css'); J=Path('app/src/main/assets/app.js'); M=Path('app/src/main/java/com/openlocal/office/MainActivity.java')
+MARK='File Gestioner spreadsheet interaction layer'
 
-HTML_MARKER = 'id="spreadsheetTools"'
-CSS_MARKER = '/* File Gestioner spreadsheet interaction layer */'
-JS_MARKER = '/* File Gestioner spreadsheet interaction layer */'
-JAVA_MARKER = 'getClipboardText()'
-
-html = INDEX.read_text()
-if HTML_MARKER not in html:
-    toolbar = r'''  <div id="spreadsheetTools" class="spreadsheetTools hidden" aria-label="Spreadsheet tools">
-    <div class="cellRefBox" id="selectedCellRef" aria-live="polite">A1</div>
-    <label class="formulaBox" aria-label="Cell value or formula">
-      <span class="fxLabel">fx</span>
-      <input id="formulaInput" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Value or formula">
-    </label>
-    <div class="sheetQuickActions" aria-label="Edit actions">
-      <button id="sheetUndo" type="button" aria-label="Undo" title="Undo">↶</button>
-      <button id="sheetRedo" type="button" aria-label="Redo" title="Redo">↷</button>
-      <button id="sheetCopy" type="button" aria-label="Copy selection" title="Copy">⧉</button>
-      <button id="sheetCut" type="button" aria-label="Cut selection" title="Cut">✂</button>
-      <buttton id="sheetPaste" type="button" aria-label="Paste" title="Paste">▃</button>
-      <button id="sheetClear" type="button" aria-label="Clear selection" title="Clear">⌫</button>
-    </div>
+h=I.read_text()
+if 'id="spreadsheetTools"' not in h:
+    bar='''  <div id="spreadsheetTools" class="spreadsheetTools hidden">
+    <b id="selectedCellRef">A1</b><label class="formulaBox"><span>fx</span><input id="formulaInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Value or formula"></label>
+    <div class="sheetQuickActions"><button id="sheetUndo" title="Undo">↶</button><button id="sheetRedo" title="Redo">↷</button><button id="sheetRange" title="Select range">▦</button><button id="sheetCopy" title="Copy">⧉</button><button id="sheetCut" title="Cut">✂</button><button id="sheetPaste" title="Paste">▣</button><button id="sheetClear" title="Clear">⌫</button></div>
   </div>\n'''
-    marker = '  <div id="textFormat" class="formatbar hidden">'
-    if marker not in html:
-        raise SystemExit('Could not locate text format bar for spreadsheet toolbar insertion')
-    html = html.replace(marker, toolbar + marker, 1)
-    INDEX.write_text(html)
+    token='  <div id="textFormat" class="formatbar hidden">'
+    if token not in h: raise SystemExit('spreadsheet toolbar insertion point missing')
+    I.write_text(h.replace(token,bar+token,1))
 
-css = CSS.read_text()
-if CSS_MARKER not in css:
-    css += r'''
+c=C.read_text()
+if MARK not in c:
+    C.write_text(c+r'''
 
 /* File Gestioner spreadsheet interaction layer */
-.spreadsheetTools{
-  display:grid;
-  grid-template-columns:auto minmax(180px,1fr) auto;
-  gap:8px;
-  align-items:center;
-  width:100%;
-  min-width:0;
-  padding:8px 10px;
-  background:var(--fg-card,var(--panel,#fff));
-  border-bottom:1px solid var(--fg-border,var(--border,#d8dde7));
-  position:relative;
-  z-index:35;
-}
-.spreadsheetTools.hidden{display:none!important}
-.cellRefBox{
-  min-width:64px;
-  height:40px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:0 10px;
-  border:1px solid var(--fg-border,var(--border,#d8dde7));
-  border-radius:10px;
-  background:var(--fg-elevated,var(--bg,#fff));
-  color:var(--fg-text,currentColor);
-  font:700 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  font-variant-numeric:tabular-nums;
-  white-space:nowrap;
-}
-.formulaBox{
-  display:grid;
-  grid-template-columns:auto minmax(0,1fr);
-  align-items:center;
-  min-width:0;
-  height:40px;
-  border:1px solid var(--fg-border,var(--border,#d8dde7));
-  border-radius:10px;
-  background:var(--fg-elevated,var(--bg,#fff));
-  overflow:hidden;
-}
-.fxLabel{
-  padding:0 9px;
-  color:var(--fg-accent,#7187ff);
-  font:800 13px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-  user-select:none;
-}
-#formulaInput{
-  width:100%;
-  min-width:0;
-  height:38px;
-  padding:0 10px 0 0;
-  border:0!important;
-  outline:0!important;
-  background:transparent!important;
-  color:var(--fg-text,currentColor)!important;
-  box-shadow:none!important;
-  font-size:14px;
-}
-.sheetQuickActions{
-  display:flex;
-  gap:4px;
-  min-width:0;
-}
-.sheetQuickActions button{
-  width:38px;
-  min-width:38px;
-  height:38px;
-  padding:0;
-  display:grid;
-  place-items:center;
-  border:1px solid var(--fg-border,var(--border,#d8dde7));
-  border-radius:10px;
-  background:var(--fg-elevated,var(--bg,#fff));
-  color:var(--fg-text,currentColor);
-  font-size:17px;
-  line-height:1;
-}
-.sheetQuickActions button:disabled{opacity:.38}
-#editor table.sheet td{
-  cursor:cell;
-  user-select:none;
-  -webkit-user-select:none;
-  position:relative;
-}
-#editor table.sheet td.fg-selected{
-  background:color-mix(in srgb,var(--fg-accent,#7187ff) 13%,transparent)!important;
-}
-#editor table.sheet td.fg-selection-edge::after{
-  content:"";
-  position:absolute;
-  inset:-1px;
-  border:2px solid var(--fg-accent,#7187ff);
-  pointer-events:none;
-  z-index:8;
-}
-#editor table.sheet td.fg-active-cell::after{
-  content:"";
-  position:absolute;
-  inset:-1px;
-  border:2px solid var(--fg-accent,#7187ff);
-  pointer-events:none;
-  z-index:9;
-}
-#editor table.sheet td[contenteditable="true"]{
-  cursor:text;
-  user-select:text;
-  -webkit-user-select:text;
-  background:var(--fg-card,#fff)!important;
-  box-shadow:inset 0 0 0 2px var(--fg-accent,#7187ff);
-  z-index:10;
-}
-#editor table.sheet th.fg-header-selected{
-  color:var(--fg-accent,#7187ff)!important;
-  background:color-mix(in srgb,var(--fg-accent,#7187ff) 12%,var(--fg-elevated,#fff))!important;
-}
-@media(max-width:700px){
-  .spreadsheetTools{
-    grid-template-columns:64px minmax(0,1fr);
-    gap:6px;
-    paddin:7px 10px 8px;
-  }
-  .cellRefBox,.formulaBox{height:38px}
-  #formulaInput{height:36px;font-size:16px}
-  .sheetQuickActions{
-    grid-column:1/-1;
-    display:grid;
-    grid-template-columns:repeat(6,1fr);
-    width:100%;
-  }
-  .sheetQuickActions button{
-    width:100%;
-    min-width:0;
-    height:36px;
-  }
-}
-'''
-    CSS.write_text(css)
+.spreadsheetTools{display:grid;grid-template-columns:auto minmax(140px,1fr) auto;gap:7px;align-items:center;padding:7px 10px;background:var(--fg-card,#fff);border-bottom:1px solid var(--fg-border,#ddd);z-index:35}.spreadsheetTools.hidden{display:none!important}
+#selectedCellRef{min-width:62px;height:38px;display:grid;place-items:center;padding:0 8px;border:1px solid var(--fg-border,#ddd);border-radius:10px;background:var(--fg-elevated,#fff);font:700 13px ui-monospace,monospace;white-space:nowrap}
+.formulaBox{height:38px;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;border:1px solid var(--fg-border,#ddd);border-radius:10px;background:var(--fg-elevated,#fff);overflow:hidden}.formulaBox span{padding:0 8px;color:var(--fg-accent,#7187ff);font-weight:800}.formulaBox input{width:100%;min-width:0;height:36px;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:inherit!important;padding:0 8px 0 0}
+.sheetQuickActions{display:flex;gap:4px}.sheetQuickActions button{width:36px;min-width:36px;height:36px;padding:0;display:grid;place-items:center;border:1px solid var(--fg-border,#ddd);border-radius:9px;background:var(--fg-elevated,#fff);color:inherit;font-size:16px}.sheetQuickActions button.active{background:var(--fg-accent,#7187ff)!important;color:#fff}.sheetQuickActions button:disabled{opacity:.35}
+#editor table.sheet td{position:relative;cursor:cell;user-select:none;-webkit-user-select:none}#editor table.sheet td.fg-selected{background:color-mix(in srgb,var(--fg-accent,#7187ff) 13%,transparent)!important}#editor table.sheet td.fg-selected::after{content:"";position:absolute;inset:-1px;border:1px solid color-mix(in srgb,var(--fg-accent,#7187ff) 65%,transparent);pointer-events:none}#editor table.sheet td.fg-active::after{content:"";position:absolute;inset:-1px;border:2px solid var(--fg-accent,#7187ff);pointer-events:none;z-index:8}#editor table.sheet td[contenteditable="true"]{cursor:text;user-select:text;-webkit-user-select:text;box-shadow:inset 0 0 0 2px var(--fg-accent,#7187ff);z-index:9}#editor table.sheet th.fg-selected-header{color:var(--fg-accent,#7187ff)!important}
+@media(max-width:700px){.spreadsheetTools{grid-template-columns:62px minmax(0,1fr)}.sheetQuickActions{grid-column:1/-1;display:grid;grid-template-columns:repeat(7,1fr)}.sheetQuickActions button{width:100%;min-width:0}.formulaBox input{font-size:16px}}
+''')
 
-app = APP.read_text()
-if JS_MARKER not in app:
-    app += r'''
+j=J.read_text()
+if MARK not in j:
+    J.write_text(j+r'''
 
 /* File Gestioner spreadsheet interaction layer */
-(() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const editor = $('editor');
-  const sheetBar = $('sheetBar');
-  const tools = $('spreadsheetTools');
-  const formula = $('formulaInput');
-  const refBox = $('selectedCellRef');
-  if(!editor || !sheetBar || !tools || !formula || !refBox) return;
+(()=>{'use strict';
+const $=id=>document.getElementById(id),E=$('editor'),SB=$('sheetBar'),T=$('spreadsheetTools'),F=$('formulaInput'),R=$('selectedCellRef');if(!E||!SB||!T||!F||!R)return;
+const S={a:null,z:null,active:null,sheet:-1,pending:null,drag:false,range:false,undo:[],redo:[],editBefore:null,tap:0,tapKey:''},B=()=>window.AndroidBridge||null;
+const cells=()=>[...E.querySelectorAll('table.sheet td[data-r][data-c]')],p=td=>td?{row:+td.dataset.r,col:+td.dataset.c}:null,key=q=>q?`${q.row}:${q.col}`:'',at=q=>q?E.querySelector(`td[data-r="${q.row}"][data-c="${q.col}"]`):null;
+function alpha(n){let s='';for(n++;n>0;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s}function ref(q){return q?alpha(q.col)+(q.row+1):''}function sheet(){let x=[...($('tabs')?.children||[])].findIndex(x=>x.classList.contains('active'));return Math.max(0,x)}function mode(){return !SB.classList.contains('hidden')&&!!E.querySelector('table.sheet')}
+function bounds(){if(!S.a||!S.z)return null;return{r1:Math.min(S.a.row,S.z.row),r2:Math.max(S.a.row,S.z.row),c1:Math.min(S.a.col,S.z.col),c2:Math.max(S.a.col,S.z.col)}}function visible(){let x=cells();if(!x.length)return null,rs=x.map(e=>+e.dataset.r),cs=x.map(e=>+e.dataset.c);return{r1:Math.min(...rs),r2:Math.max(...rs),c1:Math.min(...cs),c2:Math.max(...cs)}}
+function ui(){let b=bounds(),q=at(S.active||S.z);R.textContent=!b?'A1':ref({row:b.r1,col:b.c1})+(b.r1===b.r2&&b.c1===b.c2?'':':'+ref({row:b.r2,col:b.c2}));if(document.activeElement!==F)F.value=q?.textContent||'';$('sheetUndo').disabled=!S.undo.length;$('sheetRedo').disabled=!S.redo.length;for(let id of ['sheetCopy','sheetCut','sheetClear'])$(id).disabled=!b;$('sheetRange').classList.toggle('active',S.range)}
+function paint(){let b=bounds();E.querySelectorAll('.fg-selected,.fg-active,.fg-selected-header').forEach(x=>x.classList.remove('fg-selected','fg-active','fg-selected-header'));if(b){for(let td of cells()){let q=p(td);if(q.row>=b.r1&&q.row<=b.r2&&q.col>=b.c1&&q.col<=b.c2)td.classList.add('fg-selected')}at(S.active||S.z)?.classList.add('fg-active');let tb=E.querySelector('table.sheet'),vb=visible();if(tb&&vb){let hr=tb.tHead?.rows?.[0];if(hr)for(let i=1;i<hr.cells.length;i++){let td=tb.tBodies[0]?.rows?.[0]?.cells?.[i],q=p(td);if(q&&q.col>=b.c1&&q.col<=b.c2)hr.cells[i].classList.add('fg-selected-header')}for(let tr of [...(tb.tBodies?.[0]?.rows||[])]){let th=tr.cells[0],r=+th.textContent-1;if(r>=b.r1&&r<=b.r2)th.classList.add('fg-selected-header')}}}ui()}
+function select(q,extend=false){if(!q)return;if(!extend||!S.a)S.a={...q};S.z={...q};S.active={...q};paint()}function range(a,z){S.a={...a};S.z={...z};S.active={...a};paint()}function prep(td){td.contentEditable='false';td.tabIndex=-1;td.setAttribute('role','gridcell')}
+function sync(){let on=mode();T.classList.toggle('hidden',!on);if(!on)return;cells().forEach(prep);let sh=sheet();if(sh!==S.sheet){S.sheet=sh;S.a=S.z=S.active=null}if(S.pending&&at(S.pending)){select(S.pending);at(S.pending)?.scrollIntoView({block:'nearest',inline:'nearest'});S.pending=null}else if(S.active&&at(S.active))paint();else{let td=cells()[0];if(td)select(p(td))}}
+function history(ch){ch=ch.filter(x=>x.before!==x.after);if(!ch.length)return;S.undo.push(ch);if(S.undo.length>100)S.undo.shift();S.redo.length=0;ui()}function set(td,v){if(!td)return null;let before=td.textContent||'',after=String(v??'');if(before===after)return null;td.dataset.before=before;td.textContent=after;td.dispatchEvent(new FocusEvent('blur'));prep(td);return{...p(td),before,after}}
+function apply(ch,record=true){let done=[];for(let x of ch){let d=set(at(x),x.after);if(d)done.push(d)}if(record)history(done);paint();return done}function undo(){let a=S.undo.pop();if(!a)return;let rev=[];for(let x of a){let td=at(x),cur=td?.textContent||'',d=set(td,x.before);if(d)rev.push({...x,before:x.before,after:cur})}if(rev.length)S.redo.push(rev);ui()}function redo(){let a=S.redo.pop();if(!a)return;let back=[];for(let x of a){let td=at(x),cur=td?.textContent||'',d=set(td,x.after);if(d)back.push({...x,before:cur,after:x.after})}if(back.length)S.undo.push(back);ui()}
+function text(){let b=bounds();if(!b)return'';let out=[];for(let r=b.r1;r<=b.r2;r++){let row=[];for(let c=b.c1;c<=b.c2;c++)row.push(at({row:r,col:c})?.textContent||'');out.push(row.join('\t'))}return out.join('\n')}async function write(s){try{if(B()?.setClipboardText){B().setClipboardText(s);return}}catch(_){}try{await navigator.clipboard.writeText(s)}catch(_){}}async function read(){try{if(B()?.getClipboardText)return B().getClipboardText()||''}catch(_){}try{return await navigator.clipboard.readText()}catch(_){return''}}
+async function copy(cut=false){await write(text());if(cut)clear()}function clear(){let b=bounds(),ch=[];if(!b)return;for(let r=b.r1;r<=b.r2;r++)for(let c=b.c1;c<=b.c2;c++)if(at({row:r,col:c}))ch.push({row:r,col:c,after:''});apply(ch)}function paste(s){if(!S.active||!s)return;let rows=String(s).replace(/\r\n?/g,'\n').replace(/\n$/,'').split('\n').map(x=>x.split('\t')),vb=visible(),ch=[];rows.forEach((row,dr)=>row.forEach((v,dc)=>{let q={row:S.active.row+dr,col:S.active.col+dc};if(vb&&q.row<=vb.r2&&q.col<=vb.c2)ch.push({...q,after:v})}));let d=apply(ch);if(d.length)range(S.active,{row:d[d.length-1].row,col:d[d.length-1].col})}
+function edit(td,repl=null){if(!td)return;select(p(td));S.editBefore=td.textContent||'';td.contentEditable='true';td.dataset.before=td.textContent||'';td.focus({preventScroll:true});if(repl!==null){td.textContent=repl;let r=document.createRange();r.selectNodeContents(td);r.collapse(false);let s=getSelection();s.removeAllRanges();s.addRange(r)}}function move(dr,dc,extend=false){let q=S.active||p(cells()[0]);if(!q)return;let n={row:Math.max(0,q.row+dr),col:Math.max(0,q.col+dc)};if(at(n)){select(n,extend);at(n).focus()}else{S.pending=n;$('goCell').value=ref(n);$('goCellBtn').click()}}
+E.addEventListener('click',e=>{if(!mode())return;let th=e.target.closest('th'),vb=visible();if(th&&vb){if(th.closest('thead')){if(th.classList.contains('corner'))range({row:vb.r1,col:vb.c1},{row:vb.r2,col:vb.c2});else{let i=th.cellIndex,td=E.querySelector(`tbody tr td:nth-child(${i+1})`),q=p(td);if(q)range({row:vb.r1,col:q.col},{row:vb.r2,col:q.col})}}else if(th.classList.contains('rowh')){let r=+th.textContent-1;range({row:r,col:vb.c1},{row:r,col:vb.c2})}return}let td=e.target.closest('td[data-r][data-c]');if(!td||td.contentEditable==='true')return;let now=Date.now(),k=key(p(td));if(S.tapKey===k&&now-S.tap<420){edit(td);S.tap=0;S.tapKey=''}else{S.tap=now;S.tapKey=k;select(p(td),e.shiftKey)}} ,true);
+E.addEventListener('dblclick',e=>{let td=e.target.closest('td[data-r][data-c]');if(td){e.preventDefault();edit(td)}} ,true);E.addEventListener('focusout',e=>{let td=e.target.closest?.('td[data-r][data-c]');if(td&&td.contentEditable==='true')queueMicrotask(()=>{let q=p(td),before=S.editBefore??td.dataset.before??'',after=td.textContent||'';S.editBefore=null;if(before!==after){td.dataset.before=before;td.dispatchEvent(new FocusEvent('blur'));history([{...q,before,after}])}prep(td);select(q)})});
+E.addEventListener('pointerdown',e=>{let td=e.target.closest('td[data-r][data-c]');if(!td||td.contentEditable==='true'||(e.pointerType==='touch'&&!S.range))return;S.drag=true;select(p(td),e.shiftKey);if(e.pointerType==='touch')e.preventDefault()} ,{capture:true,passive:false});E.addEventListener('pointermove',e=>{if(!S.drag)return;let td=document.elementFromPoint(e.clientX,e.clientY)?.closest?.('td[data-r][data-c]');if(td){S.z=p(td);S.active=p(td);paint();e.preventDefault()}} ,{capture:true,passive:false});['pointerup','pointercancel'].forEach(x=>E.addEventListener(x,()=>S.drag=false,true));
+document.addEventListener('keydown',e=>{if(!mode())return;let a=document.activeElement,editing=a?.matches?.('td[contenteditable="true"],#formulaInput,input,textarea,select'),m=e.ctrlKey||e.metaKey,k=(e.key||'').toLowerCase();if(editing&&a?.id!=='formulaInput')return;if(m&&k==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(m&&k==='y'){e.preventDefault();redo();return}if(m&&k==='c'){e.preventDefault();copy();return}if(m&&k==='x'){e.preventDefault();copy(true);return}if(a?.id==='formulaInput')return;if(e.key==='ArrowUp'){e.preventDefault();move(-1,0,e.shiftKey)}else if(e.key==='ArrowDown'){e.preventDefault();move(1,0,e.shiftKey)}else if(e.key==='ArrowLeft'){e.preventDefault();move(0,-1,e.shiftKey)}else if(e.key==='ArrowRight'){e.preventDefault();move(0,1,e.shiftKey)}else if(e.key==='Enter'){e.preventDefault();move(e.shiftKey?-1:1,0)}else if(e.key==='Tab'){e.preventDefault();move(0,e.shiftKey?-1:1)}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();clear()}else if(e.key==='F2'){e.preventDefault();edit(at(S.active))}else if(!m&&!e.altKey&&e.key.length===1){e.preventDefault();edit(at(S.active),e.key)}} ,true);
+document.addEventListener('paste',e=>{if(!mode()||document.activeElement?.matches?.('td[contenteditable="true"],#formulaInput,input,textarea'))return;let s=e.clipboardData?.getData('text/plain');if(s!=null){e.preventDefault();paste(s)}} ,true);
+F.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();let td=at(S.active),before=td?.textContent||'',d=set(td,F.value);if(d)history([d]);paint()}else if(e.key==='Escape'){F.value=at(S.active)?.textContent||'';at(S.active)?.focus()}});F.addEventListener('change',()=>{let d=set(at(S.active),F.value);if(d)history([d]);paint()});
+$('sheetUndo').onclick=undo;$('sheetRedo').onclick=redo;$('sheetRange').onclick=()=>{S.range=!S.range;ui()};$('sheetCopy').onclick=()=>copy();$('sheetCut').onclick=()=>copy(true);$('sheetPaste').onclick=async()=>paste(await read());$('sheetClear').onclick=clear;
+new MutationObserver(sync).observe(E,{childList:true,subtree:true});new MutationObserver(sync).observe(SB,{attributes:true,attributeFilter:['class']});sync();
+})();
+''')
 
-  const selection = {
-    anchor:null,
-    focus:null,
-    active:null,
-    lastSheet:-1,
-    pending:null,
-    dragging:false,
-    touchTimer:null,
-    touchStart:null,
-    lastTapAt:0,
-    lastTapKey:'',
-    undo:[],
-    redo:[],
-    editBefore:null,
-  };
-  const MAX_HISTORY = 100;
-  const bridge = () => window.AndroidBridge || null;
-
-  function activeSheetIndex(){
-    const children=Array.from($('tabs')?.children||[]);
-    const active=children.findIndex(el=>el.classList.contains('active')||el.getAttribute('aria-selected')==='true');
-    return Math.max(0,active);
-  }
-  function isSpreadsheet(){
-    return !sheetBar.classList.contains('hidden') && !!editor.querySelector('table.sheet');
-  }
-  function coords(td){
-    if(!td?.matches?.('td[data-r][data-c]'))return null;
-    return {row:Number(td.dataset.r),col:Number(td.dataset.c)};
-  }
-  function keyOf(p){return p?`${p.row}:${p.col}`:'';}
-  function alpha(n){let s='';for(n++;n>0;n=Math.floor((n-1)/26))s=String.fromCharCode(65+(n-1)%26)+s;return s;}
-  function cellRef(p){return p?`${alpha(p.col)}${p.row+1}`:'';}
-  function parseAlpha(s){let n=0;for(const ch of String(s||'').trim().toUpperCase()){if(ch<'A'||ch>'Z')return -1;n=n*26+(ch.charCodeAt(0)-64);}return n-1;}
-  function cellAt(p){return p?editor.querySelector(`td[data-r="${p.row}"][data-c="${p.col}"]`):null;}
-  function visibleCells(){return Array.from(editor.querySelectorAll('table.sheet td[data-r][data-c]'));}
-  function visibleBounds(){
-    const cells=visibleCells(); if(!cells.length)return null;
-    const rows=cells.map(x=>Number(x.dataset.r)), cols=cells.map(x=>Number(x.dataset.c));
-    return {r1:Math.min(...rows),r2:Math.max(...rows),c1:Math.min(...cols),c2:Math.max(...cols)};
-  }
-  function rangeBounds(){
-    if(!selection.anchor||!selection.focus)return null;
-    return {
-      r1:Math.min(selection.anchor.row,selection.focus.row),
-      r2:Math.max(selection.anchor.row,selection.focus.row),
-      c1:Math.min(selection.anchor.col,selection.focus.col),
-      c2:Math.max(selection.anchor.col,selection.focus.col),
-    };
-  }
-  function inRange(p,b){return !!b&&p.row>=b.r1&&p.row<=b.r2&&p.col>=b.c1&&p.col<=b.c2;}
-  function selectionLabel(){
-    const b=rangeBounds();if(!b)return 'A1';
-    const a=cellRef({row:b.r1,col:b.c1}),z=cellRef({row:b.r2,col:b.c2});
-    return a===z?a:`${a}:$z{}`;
-  }
-  function updateToolbar(){
-    const active=cellAt(selection.active||selection.focus||selection.anchor);
-    refBox.textContent=selectionLabel();
-    if(document.activeElement!==formula)formula.value=active?.textContent||'';
-    $('sheetUndo').disabled=!selection.undo.length;
-    $('sheetRedo').disabled=!selection.redo.length;
-    const enabled=!!rangeBounds();
-    for(const id of ['sheetCopy','sheetCut','sheetClear'])$(id).disabled=!enabled;
-  }
-  function paintSelection(){
-    const b=rangeBounds();
-    editor.querySelectorAll('.fg-selected,.fg-active-cell,.fg-selection-edge').forEach(el=>el.classList.remove('fg-selected','fg-active-cell','fg-selection-edge'));
-    editor.querySelectorAll('.fg-header-selected').forEach(el=>el.classList.remove('fg-header-selected'));
-    if(!b){updateToolbar();return;}
-    for(const td of visibleCells(){
-      const p=coords(td); if(!inRange(p,b))continue;
-      td.classList.add('fg-selected');
-      if(p.row===b.r1||p.row===b.r2||p.col===b.c1||p.col===b.c2)td.classList.add('fg-selection-edge');
-    }
-    const active=cellAt(selection.active||selection.focus);
-    active?.classList.add('fg-active-cell');
-    const table=editor.querySelector('table.sheet');
-    if(table){
-      const head=table.tHead?.rows?.[0];
-      if(head){for(let i=1;i<head.cells.length;i++){const col=parseAlpha(head.cells[i].textContent);if(col>=b.c1&&col<=b.c2)head.cells[i].classList.add('fg-header-selected');}}
-      for(const row of Array.from(table.tBodies?.[0]?.rows||[])){
-        const th=row.cells?.[0]; if(!th)return;
-        const r=Number(th.textContent)-1;if(r>=b.r1&&r<=b.r2)th.classList.add('fg-header-selected');
-      }
-    }
-    updateToolbar();
-  }
-  function selectCell(p,extend=false,scroll=false){
-    if(!p)return;
-    if(!extend||!selection.anchor)selection.anchor={...p};
-    selection.focus={...p};selection.active={...p};
-    paintSelection();
-    if(scroll)cellAt(p)?.scrollIntoView({block:'nearest',inline:'nearest'});
-  }
-  function selectRange(a,z,active=z){selection.anchor={...a};selection.focus={...z
+m=M.read_text()
+if 'getClipboardText()' not in m:
+    n='''        @JavascriptInterface public void setSdocxText(String value){
+            try { if(sdocx!=null)sdocx.setText(value); }
+            catch(Exception e){ runOnUiThread(() -> js("window.showError("+q(message(e))+")")); }
+        }'''
+    if n not in m: raise SystemExit('clipboard bridge insertion point missing')
+    a=n+'''\n        @JavascriptInterface public String getClipboardText(){try{android.content.ClipboardManager c=(android.content.ClipboardManager)MainActivity.this.getSystemService(android.content.Context.CLIPBOARD_SERVICE);if(c==null||!c.hasPrimaryClip())return "";android.content.ClipData d=c.getPrimaryClip();if(d==null||d.getItemCount()==0)return "";CharSequence t=d.getItemAt(0).coerceToText(MainActivity.this);return t==null?"":t.toString();}catch(Exception e){return "";}}\n        @JavascriptInterface public void setClipboardText(String v){try{android.content.ClipboardManager c=(android.content.ClipboardManager)MainActivity.this.getSystemService(android.content.Context.CLIPBOARD_SERVICE);if(c!=null)c.setPrimaryClip(android.content.ClipData.newPlainText("Spreadsheet cells",v==null?"":v));}catch(Exception ignored){}}'''
+    M.write_text(m.replace(n,a,1))
