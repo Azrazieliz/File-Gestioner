@@ -68,6 +68,7 @@ jobs:
           python3 ../hotfixes/apply-mobile-spreadsheet-ui.py
           python3 ../hotfixes/apply-pro-app-branding.py
           python3 ../hotfixes/apply-spreadsheet-interactions.py
+          python3 ../hotfixes/apply-landscape-real-icon.py
           node --check app/src/main/assets/app.js
           grep -q 'getSheetWindow' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -q 'search(String needle' app/src/main/java/com/openlocal/office/core/XlsxSession.java
@@ -102,6 +103,9 @@ jobs:
           test -f app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
           grep -Fq 'id="spreadsheetTools"' app/src/main/assets/index.html
           grep -Fq 'File Gestioner spreadsheet interaction layer' app/src/main/assets/style.css
+          grep -Fq 'File Gestioner landscape + real icon' app/src/main/assets/style.css
+          grep -Fq 'android:configChanges="orientation|screenSize|keyboardHidden"' app/src/main/AndroidManifest.xml
+          test -f app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
 
 
       - name: Verify expanded viewer
