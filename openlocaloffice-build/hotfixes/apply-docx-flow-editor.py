@@ -12,7 +12,7 @@ replacement=r'''
   function renderDocx(focusIndex=null){
     clearModeBars();
     const total=state.doc.paragraphCount||0;
-    let cursor=clamp(state.docStart,0,Math.max(0,total-1));
+    let cursor=clamp(focusIndex!==null?focusIndex:state.docStart,0,Math.max(0,total-1));
     const shell=document.createElement('div');shell.className='fg-docx-edit-shell';
     const top=document.createElement('div');top.className='fg-docx-edit-top';
     const start=document.createElement('button');start.textContent='↑ Start';
