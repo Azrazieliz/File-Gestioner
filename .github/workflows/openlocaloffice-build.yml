@@ -95,6 +95,7 @@ jobs:
           python3 ../hotfixes/apply-image-zip-reader-polish.py
           python3 ../hotfixes/apply-premium-library-native.py
           python3 ../hotfixes/apply-premium-v13-reader.py
+          python3 ../hotfixes/apply-navigation-back.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -131,6 +132,8 @@ jobs:
           node ../hotfixes/test-archive-saf-regression.cjs
           node --check app/src/main/assets/premium-library.js
           node ../hotfixes/test-premium-v13.cjs
+          node ../hotfixes/test-final-reader.cjs
+          grep -Fq 'FG_BOOK' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'new SeekableZip(handle)' app/src/main/java/com/openlocal/office/core/BookArchive.java
           grep -Fq 'premium-library.js' app/src/main/assets/index.html
           grep -Fq 'ReaderLibrary.Listing' app/src/main/java/com/openlocal/office/MainActivity.java
@@ -287,6 +290,16 @@ jobs:
             adb shell am start -W -n com.openlocal.office/.MainActivity -a android.intent.action.VIEW -t application/epub+zip -d file:///data/user/0/com.openlocal.office/files/fg-large-book.epub
             sleep 5
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "Book opening crashed Android process"; exit 1; }
+            adb logcat -d -s FG_BOOK:I | tee screenshots/epub-native-parser.txt
+            grep -E 'EPUB_READY chapters=[1-9][0-9]* illustrations=[0-9]+' screenshots/epub-native-parser.txt || {
+              echo "Android EPUB parser did not parse the external-DTD book successfully"; exit 1
+            }
+            adb shell input keyevent KEYCODE_BACK
+            sleep 2
+            adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "Android Back incorrectly exited reader app"; exit 1; }
+            adb logcat -d -s FG_READER_UI:I | grep -F 'BACK_TO_LIBRARY' || {
+              echo "Android Back failed to return to the actual library"; exit 1
+            }
             adb exec-out screencap -p > screenshots/fg-86mib-epub.png
             test -s screenshots/fg-86mib-epub.png
             python3 openlocaloffice-build/hotfixes/create-image-zip-fixture.py /tmp/fg-102-images.zip
