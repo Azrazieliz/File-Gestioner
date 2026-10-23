@@ -193,8 +193,10 @@ gradle=Path("app/build.gradle.kts")
 if gradle.exists():
     build=gradle.read_text()
     if "org.apache.poi:poi-scratchpad:" not in build:
-        assert "dependencies {" in build
-        build=build.replace("dependencies {", "dependencies {\n    implementation(\"org.apache.poi:poi-scratchpad:5.4.1\")",1)
+        if "dependencies {" in build:
+            build=build.replace("dependencies {", "dependencies {\n    implementation(\"org.apache.poi:poi-scratchpad:5.4.1\")",1)
+        else:
+            build += "\ndependencies {\n    implementation(\"org.apache.poi:poi-scratchpad:5.4.1\")\n}\n"
     build=re.sub(r'versionCode\s*=\s*(\d+)',lambda m:'versionCode = '+str(int(m.group(1))+1),build,count=1)
     build=re.sub(r'versionName\s*=\s*"[^"]+"','versionName = "0.9.0"',build,count=1)
     gradle.write_text(build)
