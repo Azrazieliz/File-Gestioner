@@ -158,6 +158,11 @@ replace_once('        @JavascriptInterface public void saveCopy(){',
             try {return docx==null?"[]":RichDocxPreview.window(docx.serialize(),start,count);}
             catch(Exception e){return "[]";}
         }
+        @JavascriptInterface public String getPdfPageMetrics() {
+            try {return currentUri==null||!"pdf".equals(currentType)?"[]":
+                UniversalReader.pdfPageMetrics(MainActivity.this,currentUri);}
+            catch(Exception e){return "[]";}
+        }
         @JavascriptInterface public String getPdfPage(int index,int width) {
             try { return currentUri==null||!"pdf".equals(currentType)?"":UniversalReader.pdfPage(
                 MainActivity.this,currentUri,index,width); }
