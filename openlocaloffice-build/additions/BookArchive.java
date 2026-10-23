@@ -267,6 +267,8 @@ public final class BookArchive implements Closeable {
         org.w3c.dom.Document packageDoc=document(readSmall(opf,MAX_METADATA_BYTES));
         Element root=packageDoc.getDocumentElement();
         bookTitle=contents(root,"title");author=contents(root,"creator");
+        String navPath=null;
+        Map<String,String> navTitles=new LinkedHashMap<>();
         Map<String,String> byId=new LinkedHashMap<>();
         Map<String,String> display=new LinkedHashMap<>();
         NodeList manifest=packageDoc.getElementsByTagNameNS("*","item");
@@ -275,7 +277,26 @@ public final class BookArchive implements Closeable {
             String id=field(item,"id"),href=field(item,"href");
             if(id.isBlank()||href.isBlank())continue;
             String name=normalPath(opf,href);
-            if(!name.isBlank()){byId.put(id,name);display.put(id,href);}
+            if(!name.isBlank()){
+                byId.put(id,name);display.put(id,href);
+                String properties=field(item,"properties");
+                if(Arrays.asList(properties.split("\\s+")).contains("nav"))navPath=name;
+            }
+        }
+        // Navigation documents supply real editorial chapter titles. Only use
+        // filenames as a last resort for malformed or very old EPUBs.
+        if(navPath!=null) {
+            try {
+                org.w3c.dom.Document navigation=document(readSmall(navPath,MAX_METADATA_BYTES));
+                NodeList links=navigation.getElementsByTagNameNS("*","a");
+                for(int i=0;i<links.getLength();i++){
+                    Element link=element(links.item(i));
+                    String href=field(link,"href"),label=link.getTextContent().trim();
+                    String resolved=normalPath(navPath,href);
+                    if(!resolved.isBlank()&&!label.isBlank()&&label.length()<220)
+                        navTitles.putIfAbsent(resolved,label);
+                }
+            }catch(Exception ignored){/* A missing/invalid NAV must not erase valid reading spine */ }
         }
         NodeList spine=packageDoc.getElementsByTagNameNS("*","itemref");
         for(int i=0;i<spine.getLength();i++){
@@ -286,6 +307,7 @@ public final class BookArchive implements Closeable {
             title=title.substring(title.lastIndexOf('/')+1).replaceAll("(?i)\\.x?html?$","")
                 .replace('_',' ').replaceAll("^[0-9]+[._ -]*","").trim();
             if(title.isBlank())title="Chapter "+(chapters.size()+1);
+            title=navTitles.getOrDefault(name,title);
             chapters.add(new Chapter(name,title));
         }
         if(chapters.isEmpty())throw new IOException("EPUB contains no readable spine chapters");
