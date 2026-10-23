@@ -71,11 +71,12 @@ File Gestioner must not automatically cross-link those variants.
 
 ## What is and is not supported
 
-- Viewer already handles GLB/GLTF, OBJ, FBX, STL, PLY, DAE, 3MF, 3DS,
-  AMF, USD variants (format and WebView caveats apply).
-- `.blend`, `.blend1`, `.unity3d`, `.assetbundle` and `.zipmod` are
+- Viewer handles GLB/GLTF/VRM (VRM basic glTF geometry, not full MToon),
+  OBJ, FBX, STL, PLY, DAE, 3MF, 3DS, AMF, USD variants (format and WebView caveats apply).
+- `.blend`, `.blend1`, `.unity3d`, `.assetbundle`, `.zipmod`, `.pmx`,
+  `.pmd`, `.uasset` and `.umap` are
   classified as **native authoring sources**, shown with a conversion
-  explanation without loading their full bytes. They are NOT parsed as 3D.
+  explanation without loading their full bytes. They are NOT parsed as 3D. Unreal `.uasset`/`.umap` must be preview-exported from the Unreal Editor, and MMD PMX/PMD needs a compatible installed MMD importer.
 - The new NoWorld metadata panel is populated **only** when a valid tagged
   GLB actually embeds `noworld.asset.preview.v1` metadata. A filename
   beginning with `NW_` is not sufficient evidence.
