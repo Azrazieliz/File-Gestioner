@@ -14,8 +14,8 @@ replace_once('private static final long MAX_FILE_BYTES = 40L * 1024L * 1024L;',
              'private static final long MAX_FILE_BYTES = 80L * 1024L * 1024L;')
 replace_once('                long size = displaySize(uri);',
 '''                String quickType = detectType(uri, name);
-                if ("mp3".equals(quickType) || "mp4".equals(quickType)) {
-                    throw new IOException("MP3 and MP4 are not document formats and are deliberately excluded.");
+                if ("mp3".equals(quickType) || "mp4".equals(quickType) || "pptx".equals(quickType)) {
+                    throw new IOException("MP3, MP4 and PPTX are excluded from File Gestioner reading.");
                 }
                 if ("pdf".equals(quickType)) {
                     int pages = UniversalReader.pdfPages(this, uri);
@@ -32,7 +32,7 @@ replace_once('                long size = displaySize(uri);',
                 }
                 long size = displaySize(uri);''')
 replace_once('                } else if ("xls".equals(type)) {',
-'''                } else if ("pptx".equals(type) || "epub".equals(type) ||
+'''                } else if ("epub".equals(type) ||
                            "odt".equals(type) || "ods".equals(type) || "odp".equals(type)) {
                     textDocument = UniversalReader.extractDocument(bytes,type);
                     currentType = type; currentMime = mimeForPreview(type);
@@ -83,7 +83,6 @@ replace_once('    private byte[] serializeCurrent() throws Exception {',
     private static String mimeForPreview(String type) {
         if ("pdf".equals(type))return "application/pdf";
         if ("epub".equals(type))return "application/epub+zip";
-        if ("pptx".equals(type))return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
         if ("odt".equals(type))return "application/vnd.oasis.opendocument.text";
         if ("ods".equals(type))return "application/vnd.oasis.opendocument.spreadsheet";
         if ("odp".equals(type))return "application/vnd.oasis.opendocument.presentation";
@@ -130,13 +129,19 @@ replace_once('        if("application/vnd.openxmlformats-officedocument.spreadsh
         if("application/vnd.oasis.opendocument.presentation".equals(m))return "odp";
         if("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(m))return "xlsx";''')
 replace_once('        return "";\n    }\n    private long displaySize',
-'''        if(m!=null && m.startsWith("text/"))return "txt";
+'''        if("audio/mpeg".equals(m))return "mp3";
+        if("video/mp4".equals(m))return "mp4";
+        if(m!=null && m.startsWith("text/"))return "txt";
         return "";
     }
     private long displaySize''')
 
 replace_once('        @JavascriptInterface public void saveCopy(){',
-'''        @JavascriptInterface public String getDocxRichWindow(int start,int count) {
+'''        @JavascriptInterface public int getDocxRichBlockCount() {
+            try {return docx==null?0:RichDocxPreview.blockCount(docx.serialize());}
+            catch(Exception e){return 0;}
+        }
+        @JavascriptInterface public String getDocxRichWindow(int start,int count) {
             try {return docx==null?"[]":RichDocxPreview.window(docx.serialize(),start,count);}
             catch(Exception e){return "[]";}
         }
@@ -162,7 +167,6 @@ assert anchor in manifest
 manifest=manifest.replace(anchor,anchor+'''
                 <data android:mimeType="application/pdf" />
                 <data android:mimeType="application/epub+zip" />
-                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
                 <data android:mimeType="application/vnd.oasis.opendocument.text" />
                 <data android:mimeType="application/vnd.oasis.opendocument.spreadsheet" />
                 <data android:mimeType="application/vnd.oasis.opendocument.presentation" />
@@ -174,6 +178,6 @@ gradle=Path("app/build.gradle.kts")
 if gradle.exists():
     build=gradle.read_text()
     build=re.sub(r'versionCode\s*=\s*(\d+)',lambda m:'versionCode = '+str(int(m.group(1))+1),build,count=1)
-    build=re.sub(r'versionName\s*=\s*"[^"]+"','versionName = "0.8.0"',build,count=1)
+    build=re.sub(r'versionName\s*=\s*"[^"]+"','versionName = "0.9.0"',build,count=1)
     gradle.write_text(build)
 print("Universal document reader backend installed")
