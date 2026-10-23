@@ -200,11 +200,26 @@ search.addEventListener('input',()=>{phrase=search.value;render();});
 const homeNav=b('Library','fg-lib-top-link',show);
 homeNav.title='Open your library';
 document.querySelector('.bar .actions')?.prepend(homeNav);
+// Document opens from the Files picker, Round Sync and direct share intents
+// must enter the same reader state as a library-card click.
+const upstreamLoad=window.loadDocument;
+window.loadDocument=function(payload){
+ visible=false;
+ root.classList.add('fg-lib-hidden');
+ document.getElementById('home')?.classList.add('hidden');
+ document.getElementById('work')?.classList.remove('hidden');
+ return upstreamLoad(payload);
+};
 function handleAndroidBack(){
  // Reading settings are a modal surface, not an exit command.
  const drawer=document.querySelector('.fg-book-drawer:not(.fg-book-hidden)');
  if(drawer){drawer.classList.add('fg-book-hidden');return true;}
  if(visible){
+   // Also tolerate older reader states in which the library flag remained
+   // true after a document was opened from an external Android provider.
+   if(!document.getElementById('work')?.classList.contains('hidden')){
+     show();bridge()?.readerDiagnostic?.('BACK_TO_LIBRARY');return true;
+   }
    if(stack.length){navigateBack();return true;}
    // Root collection is the app's top-level destination.
    return false;
