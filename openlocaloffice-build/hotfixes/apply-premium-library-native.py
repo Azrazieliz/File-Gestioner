@@ -121,6 +121,13 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
         });
     }
     private void openUri(Uri uri) {''')
+once('''                    BookArchive candidate=new BookArchive(this,uri,false);
+                    bookArchive=candidate;''','''                    long indexedAt=android.os.SystemClock.elapsedRealtime();
+                    BookArchive candidate=new BookArchive(this,uri,false);
+                    android.util.Log.i("FG_ARCHIVE","ZIP_READY count="+candidate.imageCount()+
+                        " comic="+candidate.comicLike()+" elapsed_ms="+
+                        (android.os.SystemClock.elapsedRealtime()-indexedAt));
+                    bookArchive=candidate;''')
 once('''                    imageStreamToken=java.util.UUID.randomUUID().toString();
                     remember(uri,name,currentMime);
                     String url="https://fg-assets.invalid/raw/"+imageStreamToken+"/image";
