@@ -212,6 +212,7 @@ function handleAndroidBack(){
  // Return to the actual library, regardless of whether the source was
  // opened through Round Sync, Files, or a collection tile.
  show();
+ bridge()?.readerDiagnostic?.('BACK_TO_LIBRARY');
  return true;
 }
 window.FileGestionerLibrary={
