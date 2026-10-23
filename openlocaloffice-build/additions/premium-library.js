@@ -200,8 +200,22 @@ search.addEventListener('input',()=>{phrase=search.value;render();});
 const homeNav=b('Library','fg-lib-top-link',show);
 homeNav.title='Open your library';
 document.querySelector('.bar .actions')?.prepend(homeNav);
+window.FileGestionerNavigation={
+ back(){
+   // Escape from EPUB reading preferences/TOC without closing the book.
+   const activeDrawer=document.querySelector('.fg-book-drawer:not(.fg-book-hidden)');
+   if(activeDrawer){activeDrawer.classList.add('fg-book-hidden');return true;}
+   // The system back gesture walks selected collections in the bookshelf.
+   if(visible){
+     if(stack.length){navigateBack();return true;}
+     bridge()?.exitFromLibraryRoot?.();
+     return true;
+   }
+   show();return true;
+ }
+};
 window.FileGestionerLibrary={
- show,receive,error,openCollection:()=>{
+ show,receive,error,back:navigateBack,isVisible:()=>visible,openCollection:()=>{
    currentFolder='';stack=[];show();
  },missingCollection:showEmpty
 };
