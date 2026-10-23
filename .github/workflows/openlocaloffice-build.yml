@@ -80,6 +80,10 @@ jobs:
           python3 ../hotfixes/apply-universal-reader-ui.py
           python3 ../hotfixes/apply-docx-flow-editor.py
           python3 ../hotfixes/apply-3d-asset-viewer.py
+          python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
+          python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
+          grep -Fq 'source_anchor' ../hotfixes/apply-3d-asset-viewer.py
+
           # Bundle source-pinned, vendored Three.js; NO runtime CDN or model upload.
           mkdir -p app/src/main/assets/three-vendor
           cp -R ../three-vendor/. app/src/main/assets/three-vendor/
@@ -90,6 +94,10 @@ jobs:
           test -s app/src/main/assets/model-viewer.bundle.js
           node --check app/src/main/assets/model-viewer.bundle.js
           grep -Fq 'window.FileGestionerModelViewer=' app/src/main/assets/model-viewer.entry.js
+          grep -Fq 'NoWorld · Source-linked asset preview' app/src/main/assets/model-viewer.entry.js
+          grep -Fq 'requiresConversion' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'noworld_asset' app/src/main/assets/model-viewer.bundle.js
+
           grep -Fq 'model3d' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'model/*' app/src/main/AndroidManifest.xml
           bash ../hotfixes/test-rich-docx-reader.sh
