@@ -308,14 +308,24 @@ public final class BookArchive implements Closeable {
             return output.toByteArray();
         }
     }
-    private static org.w3c.dom.Document document(byte[] bytes) throws Exception{
+    /** The Android platform XML parser does not consistently implement
+     * Apache/Xerces setFeature URIs. EPUB2 packages may also declare a harmless
+     * external OPF DTD. Strip the external declaration rather than causing
+     * ParserConfigurationException or allowing network/entity resolution.
+     * Reject internal entity subsets and DTD entity declarations explicitly.
+     */
+    private static org.w3c.dom.Document document(byte[] bytes) throws Exception {
+        String xml=new String(bytes,StandardCharsets.UTF_8);
+        if(java.util.regex.Pattern.compile("(?is)<!\\s*ENTITY\\b|<!\\s*DOCTYPE[^>]*\\[")
+            .matcher(xml).find())throw new IOException("EPUB XML contains unsupported entity declarations");
+        xml=xml.replaceAll("(?is)<!\\s*DOCTYPE\\s+[^>]*>","");
         DocumentBuilderFactory f=DocumentBuilderFactory.newInstance();
         f.setNamespaceAware(true);
-        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
-        f.setFeature("http://xml.org/sax/features/external-general-entities",false);
-        f.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
         f.setExpandEntityReferences(false);
-        return f.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
+        javax.xml.parsers.DocumentBuilder parser=f.newDocumentBuilder();
+        parser.setEntityResolver((publicId,systemId)->
+            new org.xml.sax.InputSource(new java.io.StringReader("")));
+        return parser.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
     }
     private static Element element(Node node){return node instanceof Element?(Element)node:null;}
     private static String field(Element e,String attr){return e==null?"":e.getAttribute(attr);}
