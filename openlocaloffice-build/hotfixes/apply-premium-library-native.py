@@ -139,6 +139,10 @@ once('''                    imageStreamToken=java.util.UUID.randomUUID().toStrin
                         ",\\"koikatsuCard\\":"+character+
                         ",\\"linked3d\\":"+(character&&savedCharacterPreview()!=null)+''')
 once('''        @JavascriptInterface public void pickFile(){ runOnUiThread(MainActivity.this::openPicker); }''','''        @JavascriptInterface public void pickFile(){ runOnUiThread(MainActivity.this::openPicker); }
+        @JavascriptInterface public void readerDiagnostic(String event){
+            if(event!=null&&event.length()<100)
+                android.util.Log.i("FG_READER_UI",event);
+        }
         @JavascriptInterface public void pickLibraryFolder(){
             runOnUiThread(MainActivity.this::selectLibraryFolder);
         }
