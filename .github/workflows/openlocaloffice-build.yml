@@ -261,6 +261,15 @@ jobs:
             mkdir -p screenshots
             adb exec-out screencap -p > screenshots/fg-reader-home.png
             test -s screenshots/fg-reader-home.png
+            python3 openlocaloffice-build/hotfixes/create-large-epub-fixture.py /tmp/fg-large-book.epub
+            adb shell run-as com.openlocal.office mkdir -p files
+            adb exec-in run-as com.openlocal.office sh -c 'cat > files/fg-large-book.epub' < /tmp/fg-large-book.epub
+            adb shell am start -W -n com.openlocal.office/.MainActivity -a android.intent.action.VIEW -t application/epub+zip -d file:///data/user/0/com.openlocal.office/files/fg-large-book.epub
+            sleep 5
+            adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "Book opening crashed Android process"; exit 1; }
+            adb exec-out screencap -p > screenshots/fg-86mib-epub.png
+            test -s screenshots/fg-86mib-epub.png
+            rm -f /tmp/fg-large-book.epub
             adb logcat -b crash -d | tee screenshots/crash-log.txt
             if grep -q 'FATAL EXCEPTION' screenshots/crash-log.txt; then exit 1; fi
 
