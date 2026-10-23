@@ -30,6 +30,7 @@ public final class BookArchive implements Closeable {
     private String bookTitle = "";
     private String author = "";
     private final ArrayList<String> archiveImages = new ArrayList<>();
+    private final ArrayList<String> archiveAll = new ArrayList<>();
     private static final int MAX_CHAPTER_BYTES=6*1024*1024;
     private static final int MAX_METADATA_BYTES=2*1024*1024;
     private static final int MAX_IMAGE_BYTES=128*1024*1024;
@@ -81,7 +82,10 @@ public final class BookArchive implements Closeable {
                 ZipEntry entry=entries.nextElement();
                 if(++index>150000)throw new IOException("Archive index is unusually large");
                 String name=entry.getName();
-                if(!entry.isDirectory()&&isImage(name))archiveImages.add(name);
+                if(!entry.isDirectory()){
+                    archiveAll.add(name);
+                    if(isImage(name))archiveImages.add(name);
+                }
             }
             if(epub)readPackage();
         }catch(Exception failure){
@@ -128,9 +132,35 @@ public final class BookArchive implements Closeable {
         JSONArray list=new JSONArray();
         for(int i=0;i<archiveImages.size();i++) {
             String entry=archiveImages.get(i);
-            list.put(new JSONObject().put("index",i).put("name",entry));
+            list.put(new JSONObject().put("index",i).put("name",entry)
+                .put("preview",true).put("streamed",true));
         }
         return list;
+    }
+    public JSONArray fileList() throws Exception {
+        JSONArray list=new JSONArray();
+        for(int i=0;i<archiveAll.size();i++){
+            String name=archiveAll.get(i);
+            ZipEntry e=zip.getEntry(name);
+            list.put(new JSONObject().put("name",name).put("size",e==null?-1:e.getSize())
+                .put("streamed",isImage(name)).put("preview",isImage(name)||isText(name)));
+        }
+        return list;
+    }
+    private static boolean isText(String name){
+        String n=name.toLowerCase(Locale.ROOT);
+        return n.endsWith(".txt")||n.endsWith(".md")||n.endsWith(".json")||
+            n.endsWith(".xml")||n.endsWith(".csv")||n.endsWith(".html")||
+            n.endsWith(".xhtml")||n.endsWith(".yaml");
+    }
+    public String entryBase64(String name) throws Exception {
+        if(!isText(name)&&!isImage(name))return "";
+        byte[] raw=readSmall(name,isImage(name)?12*1024*1024:4*1024*1024);
+        return android.util.Base64.encodeToString(raw,android.util.Base64.NO_WRAP);
+    }
+    public String urlForEntry(String name) {
+        if(!isImage(name)||zip.getEntry(name)==null)return "";
+        return assetUrl(name);
     }
     public WebResourceResponse response(String requestedPath) throws IOException {
         // The URL contains an unguessable session token and a path that is
