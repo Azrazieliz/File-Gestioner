@@ -47,6 +47,7 @@ class Observer{constructor(cb,options){this.cb=cb;this.options=options;this.obse
 const win={loadDocument:()=>{},AndroidBridge:bridge,devicePixelRatio:2,
  IntersectionObserver:Observer};
 const context={window:win,document,console,TextDecoder,TextEncoder,Uint8Array,
+ IntersectionObserver:Observer,
  requestAnimationFrame:fn=>{pending.push(fn);return pending.length;},
  cancelAnimationFrame:()=>{},atob:()=>'\0',
  URL:{createObjectURL:()=>'',revokeObjectURL:()=>{}},
