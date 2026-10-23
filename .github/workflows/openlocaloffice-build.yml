@@ -265,7 +265,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: 35
           arch: x86_64
           profile: pixel_6
           disable-animations: true
@@ -275,6 +275,9 @@ jobs:
             adb shell am start -W -n com.openlocal.office/.MainActivity
             sleep 3
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "File Gestioner failed to launch"; exit 1; }
+            adb logcat -d -s FG_READER_UI:I | grep -F 'LIBRARY_READY' || {
+              echo "The library WebView UI did not finish initializing"; exit 1
+            }
             mkdir -p screenshots
             adb exec-out screencap -p > screenshots/fg-reader-home.png
             test -s screenshots/fg-reader-home.png
@@ -292,6 +295,10 @@ jobs:
             sleep 4
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "ZIP comic reader crashed"; exit 1; }
             adb logcat -d -s FG_ARCHIVE:I | tee screenshots/archive-index-benchmark.txt
+            adb logcat -d -s FG_READER_UI:I | tee screenshots/reader-ui-events.txt
+            grep -F 'COMIC_IMAGE_LOADED' screenshots/reader-ui-events.txt || {
+              echo "The 102-page ZIP was indexed but the actual comic page did not decode"; exit 1
+            }
             grep -Eq 'ZIP_READY count=102 comic=true elapsed_ms=[0-9]+' screenshots/archive-index-benchmark.txt || {
               echo "The >30MiB ZIP did not successfully index all 102 images in comic mode"
               exit 1
