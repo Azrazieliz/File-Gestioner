@@ -31,7 +31,11 @@ replace_once('                long size = displaySize(uri);',
                     return;
                 }
                 long size = displaySize(uri);''')
-replace_once('                } else if ("xls".equals(type)) {',
+replace_once('                } else if ("doc".equals(type)) {
+                    textDocument=LegacyOfficeReader.read(bytes,"doc");
+                    currentType="doc"; currentMime=mimeForPreview(type);
+                    json = readerJson(name,type,textDocument.length());
+                } else if ("xls".equals(type)) {',
 '''                } else if ("epub".equals(type) ||
                            "odt".equals(type) || "ods".equals(type) || "odp".equals(type)) {
                     textDocument = UniversalReader.extractDocument(bytes,type);
@@ -64,8 +68,9 @@ replace_once('                } else if ("xls".equals(type)) {',
                     json=readerJson(name,type,textDocument.length());
                 } else if ("xls".equals(type)) {''')
 replace_once('                    throw new IOException("Legacy .xls is not included in this offline build. Save it as .xlsx first.");',
-'''                    rawDocument=bytes; currentType="xls"; currentMime=mimeForPreview(type);
-                    json = binaryJson(name,type,bytes.length);''')
+'''                    textDocument=LegacyOfficeReader.read(bytes,"xls");
+                    currentType="xls"; currentMime=mimeForPreview(type);
+                    json = readerJson(name,type,textDocument.length());''')
 replace_once('                    throw new IOException("Unsupported file. Open an .xlsx, .csv, .docx, .txt, .md or .sdocx file.");',
 '''                    rawDocument=bytes; currentType=type.isEmpty()?"unknown":type;
                     currentMime=mimeForPreview(type); json=binaryJson(name,currentType,bytes.length);''')
@@ -81,6 +86,8 @@ replace_once('    private byte[] serializeCurrent() throws Exception {',
             "gradle","gitignore","dockerfile").contains(type);
     }
     private static String mimeForPreview(String type) {
+        if ("doc".equals(type))return "application/msword";
+        if ("xls".equals(type))return "application/vnd.ms-excel";
         if ("pdf".equals(type))return "application/pdf";
         if ("epub".equals(type))return "application/epub+zip";
         if ("odt".equals(type))return "application/vnd.oasis.opendocument.text";
@@ -106,7 +113,7 @@ replace_once('    private byte[] serializeCurrent() throws Exception {',
 
     private byte[] serializeCurrent() throws Exception {''')
 replace_once('        if (xlsx != null) return xlsx.serialize();',
-'''        if (Arrays.asList("pdf","pptx","epub","odt","ods","odp","zip","cbz",
+'''        if (Arrays.asList("pdf","pptx","doc","epub","odt","ods","odp","zip","cbz",
               "image","rtf","html","htm","xls","unknown").contains(currentType) ||
               isImageType(currentType) || isTextType(currentType)) {
             throw new IOException("This format is available for reading only; editing the original is disabled.");
@@ -117,10 +124,12 @@ replace_once('    private String detectType(Uri uri,String name){',
 replace_once('        if("xlsx".equals(ext)||"csv".equals(ext)||"docx".equals(ext)||"txt".equals(ext)||"md".equals(ext)||"markdown".equals(ext)||"sdocx".equals(ext)||"xls".equals(ext))return ext;',
 '''        if(!ext.isEmpty() &&
            (Arrays.asList("xlsx","csv","docx","txt","md","markdown","sdocx","xls",
-              "pdf","pptx","epub","odt","ods","odp","zip","cbz","rtf","html","htm","mp3","mp4").contains(ext) ||
+              "pdf","pptx","epub","odt","ods","odp","zip","cbz","rtf","html","htm","doc","mp3","mp4").contains(ext) ||
              isImageType(ext) || isTextType(ext)))return ext;''')
 replace_once('        if("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(m))return "xlsx";',
-'''        if("application/pdf".equals(m))return "pdf";
+'''        if("application/msword".equals(m))return "doc";
+        if("application/vnd.ms-excel".equals(m))return "xls";
+        if("application/pdf".equals(m))return "pdf";
         if("application/epub+zip".equals(m))return "epub";
         if(m!=null && m.startsWith("image/"))return m.substring(6).replace("svg+xml","svg");
         if("application/vnd.openxmlformats-officedocument.presentationml.presentation".equals(m))return "pptx";
