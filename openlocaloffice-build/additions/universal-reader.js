@@ -19,11 +19,6 @@ function stage(t,content,hasTextSearch=false){
  document.querySelector('.searchbar')?.classList.toggle('hidden',!hasTextSearch);
  if(ro(doc)){$('saveBtn').disabled=true;$('copyBtn').disabled=true;}
 }
-function controls(bar,count,render){
- const prev=button('‹',()=>{page=Math.max(0,page-1);render();});prev.disabled=page<=0;
- const next=button('›',()=>{page=Math.min(count-1,page+1);render();});next.disabled=page>=count-1;
- bar.append(prev,E('span','fg-reader-counter',(page+1)+' / '+count),next);
-}
 function zoomer(bar,render){
  bar.append(button('−',()=>{zoom=Math.max(.7,zoom-.15);render();}),
   E('span','fg-reader-counter',Math.round(zoom*100)+'%'),
@@ -43,15 +38,144 @@ function localBytes(){
  for(const c of chunks){out.set(c,pos);pos+=c.length;}
  return out;
 }
+/* Continuous PDFs: one vertical document, native aspect-ratio placeholders,
+   render only pages approaching the viewport and free distant bitmaps. */
+let activeReaderCleanup=null;
 function pdf(){
- const [bar,tools]=toolbar('Native PDF page · offline');
- controls(tools,doc.pages,pdf);zoomer(tools,pdf);
- const body=E('div','fg-reader-scroll'),p=paper('fg-pdf-sheet'),image=E('img','fg-pdf-img');
- image.alt='PDF page '+(page+1);
- const data=bridge()?.getPdfPage?.(page,Math.round(960*zoom));
- if(data){image.src='data:image/jpeg;base64,'+data;p.appendChild(image);}
- else p.appendChild(E('p','fg-reader-empty','Cannot display page. The PDF may be password-protected or unsupported.'));
- body.appendChild(p);stage(bar,body);
+ const b=bridge();
+ const count=Math.max(0,Number(doc.pages)||0);
+ const [bar,tools]=toolbar('Continuous PDF · swipe vertically');
+ const body=E('div','fg-reader-scroll fg-pdf-scroll');
+ body.setAttribute('role','document');
+ body.setAttribute('aria-label',(doc.name||'PDF')+' · '+count+' pages');
+ const stack=E('div','fg-pdf-stack');
+ const refs=[],loaded=new Map(),waiting=new Set();
+ let metrics=[],observer=null,disposed=false,scheduled=false,readingPage=0,zoomValue=1;
+ try{metrics=JSON.parse(b?.getPdfPageMetrics?.()||'[]');}catch(_){}
+ if(!Array.isArray(metrics))metrics=[];
+ const progress=E('span','fg-reader-counter fg-pdf-progress',
+   count?'Page 1 of '+count:'Empty PDF');
+ progress.setAttribute('aria-live','off');
+ const zoomLabel=E('span','fg-reader-counter','Fit width');
+ const container=E('div','fg-pdf-container');
+ stack.appendChild(container);
+ body.appendChild(stack);
+ function widthPx(){return Math.max(360,Math.min(1500,
+     Math.round(Math.max(360,body.clientWidth-20)*(window.devicePixelRatio||1)*zoomValue)));}
+ function put(index){
+   if(disposed||loaded.has(index)||waiting.has(index)||index<0||index>=count)return;
+   waiting.add(index);
+   if(!scheduled){scheduled=true;requestAnimationFrame(drawNext);}
+ }
+ function drawNext(){
+   scheduled=false;
+   if(disposed)return;
+   const iterator=waiting.values(),next=iterator.next();
+   if(next.done)return;
+   const index=next.value;waiting.delete(index);
+   const cell=refs[index];
+   if(!cell)return;
+   // Never do expensive bridge PDF rendering for pages now far from view.
+   const viewport=body.getBoundingClientRect(),bounds=cell.getBoundingClientRect();
+   if(bounds.bottom<viewport.top-2*body.clientHeight ||
+      bounds.top>viewport.bottom+2*body.clientHeight){
+     if(waiting.size){scheduled=true;requestAnimationFrame(drawNext);}return;
+   }
+   try{
+     const data=b?.getPdfPage?.(index,widthPx());
+     if(!data)throw Error('The page could not be rendered.');
+     const img=E('img','fg-pdf-img');
+     img.alt='Page '+(index+1)+' of '+count;
+     img.decoding='async';
+     img.src='data:image/jpeg;base64,'+data;
+     img.onerror=()=>{if(!disposed)cell.replaceChildren(
+       E('div','fg-reader-empty','Page '+(index+1)+' could not be displayed.'));};
+     cell.replaceChildren(img);
+     loaded.set(index,{img,pixels:widthPx()});
+   }catch(error){
+     cell.replaceChildren(E('div','fg-reader-empty',
+       'Cannot display page '+(index+1)+': '+String(error.message||error)));
+   }
+   trim();
+   if(waiting.size){scheduled=true;requestAnimationFrame(drawNext);}
+ }
+ function trim(){
+   const viewport=body.getBoundingClientRect();
+   for(const [i,item] of loaded){
+     const box=refs[i].getBoundingClientRect();
+     if(box.bottom<viewport.top-2.5*body.clientHeight ||
+        box.top>viewport.bottom+2.5*body.clientHeight){
+       item.img.removeAttribute('src');
+       loaded.delete(i);
+       refs[i].replaceChildren(E('div','fg-pdf-skeleton','Page '+(i+1)));
+     }
+   }
+ }
+ function updateCurrent(){
+   if(disposed)return;
+   const center=body.getBoundingClientRect().top+Math.max(20,body.clientHeight*.3);
+   let best=readingPage,dist=Infinity;
+   for(let i=0;i<count;i++){
+     const rect=refs[i].getBoundingClientRect();
+     const d=rect.top>center?rect.top-center:rect.bottom<center?center-rect.bottom:0;
+     if(d<dist){dist=d;best=i;if(d===0)break;}
+   }
+   readingPage=best;progress.textContent='Page '+(best+1)+' of '+count;
+   trim();
+   // Fallback if WebView lacks IntersectionObserver.
+   if(!observer)for(let i=Math.max(0,best-1);i<=Math.min(count-1,best+2);i++)put(i);
+ }
+ function resizeZoom(delta,fit=false){
+   zoomValue=fit?1:Math.max(.7,Math.min(2.5,Math.round((zoomValue+delta)*100)/100));
+   stack.style.width=Math.round(zoomValue*100)+'%';
+   zoomLabel.textContent=zoomValue===1?'Fit width':Math.round(zoomValue*100)+'%';
+   for(const [i,item] of loaded){
+     item.img.removeAttribute('src');
+     loaded.delete(i);
+     refs[i].replaceChildren(E('div','fg-pdf-skeleton','Page '+(i+1)));
+   }
+   updateCurrent();
+   for(let i=Math.max(0,readingPage-1);i<=Math.min(count-1,readingPage+1);i++)put(i);
+ }
+ tools.append(progress,
+   button('−',()=>resizeZoom(-.15)),
+   zoomLabel,button('+',()=>resizeZoom(.15)),
+   button('Fit width',()=>resizeZoom(0,true)));
+ for(let i=0;i<count;i++){
+   const metricsEntry=metrics[i];
+   const w=Number(metricsEntry?.[0]),h=Number(metricsEntry?.[1]);
+   const aspect=w>0&&h>0?w/h:.707;
+   const cell=E('section','fg-pdf-section');
+   cell.dataset.page=String(i+1);
+   cell.style.aspectRatio=String(aspect);
+   cell.setAttribute('aria-label','PDF page '+(i+1));
+   cell.appendChild(E('div','fg-pdf-skeleton','Page '+(i+1)));
+   container.appendChild(cell);refs.push(cell);
+ }
+ if(!count)container.appendChild(E('p','fg-reader-empty','The PDF contains no pages.'));
+ stage(bar,body);
+ if(window.IntersectionObserver){
+   observer=new IntersectionObserver(items=>{
+     if(disposed)return;
+     for(const item of items)if(item.isIntersecting){
+       const i=Number(item.target.dataset.page)-1;put(i);
+     }
+   },{root:body,rootMargin:'90% 0px',threshold:0});
+   for(const cell of refs)observer.observe(cell);
+ }
+ let raf=0;
+ const onScroll=()=>{
+   if(raf)return;
+   raf=requestAnimationFrame(()=>{raf=0;updateCurrent();});
+ };
+ body.addEventListener('scroll',onScroll,{passive:true});
+ if(count){put(0);if(count>1)put(1);}
+ activeReaderCleanup=()=>{
+   disposed=true;observer?.disconnect();waiting.clear();
+   if(raf)cancelAnimationFrame(raf);
+   for(const item of loaded.values())item.img.removeAttribute('src');
+   loaded.clear();
+ };
 }
 function imageView(){
  const [bar,tools]=toolbar('Image preview · pinch/scroll to inspect');
@@ -65,34 +189,6 @@ function imageView(){
   body.appendChild(img);
  }catch(e){body.appendChild(E('p','fg-reader-empty',String(e.message||e)));}
  stage(bar,body);
-}
-/* Accessible, paragraph-boundary text pagination: never slice mid-word. */
-let textCache=null;
-function readablePages(raw,format){
- const input=String(raw||'').replace(/\r\n?/g,'\n');
- if(textCache&&textCache.input===input&&textCache.format===format)return textCache.pages;
- const limit=22000,pages=[],parts=input.split(/(\n{2,})/);
- let current='';
- function flush(){if(current){pages.push(current);current='';}}
- for(const part of parts){
-   if(!part)continue;
-   if(part.length>limit){
-     flush();
-     let rem=part;
-     while(rem.length>limit){
-       let cut=rem.lastIndexOf(' ',limit);
-       if(cut<limit*.55)cut=rem.lastIndexOf('\n',limit);
-       if(cut<limit*.55)cut=limit;
-       pages.push(rem.slice(0,cut));rem=rem.slice(cut).replace(/^\s+/,'');
-     }
-     current=rem;continue;
-   }
-   if(current.length+part.length>limit)flush();
-   current+=part;
- }
- flush();
- if(!pages.length)pages.push('');
- textCache={input,format,pages};return pages;
 }
 function addLines(host,raw,format){
  const code=/^(json|xml|yaml|yml|toml|log|sql|tsv|java|kt|kts|js|ts|css|scss|py|sh|ini|conf|svg|gradle|c|cpp|h|hpp|go|rs|php|gitignore)$/.test(format||'');
@@ -133,15 +229,53 @@ function addLines(host,raw,format){
  flush();
  if(codeBlock)host.appendChild(E('pre','fg-document-code',codeBlock.join('\n')));
 }
+/* TXT, Markdown, EPUB, ODT/ODS text and code all scroll in ONE document.
+   Large sources append source-preserving blocks rather than artificial pages. */
 function textView(){
  const text=String(bridge()?.getText?.()||'');
- const pages=readablePages(text,doc.format);
- page=Math.min(page,pages.length-1);
- const [bar,tools]=toolbar('Document view · original paragraph boundaries');
- controls(tools,pages.length,textView);zoomer(tools,textView);
- const body=E('div','fg-reader-scroll'),p=paper('fg-document-sheet');
- addLines(p,pages[page],doc.format);
- body.appendChild(p);stage(bar,body);
+ const [bar,tools]=toolbar('Continuous document · vertical scrolling');
+ const body=E('div','fg-reader-scroll fg-text-scroll');
+ const sheet=paper('fg-document-sheet fg-continuous-text');
+ sheet.setAttribute('role','document');
+ sheet.setAttribute('aria-label',doc.name||'Document');
+ let size=1;
+ const setSize=delta=>{
+   size=Math.max(.75,Math.min(2,Math.round((size+delta)*100)/100));
+   sheet.style.setProperty('--fg-size',String(size));
+ };
+ tools.append(button('A−',()=>setSize(-.1)),button('A+',()=>setSize(.1)));
+ if(text.length<=2_000_000) {
+   addLines(sheet,text,doc.format);
+ } else {
+   // Very large files: preserve every character, including whitespace and
+   // original line breaks, while avoiding a monolithic UI-thread DOM build.
+   let offset=0,loading=false;
+   function append(){
+     if(loading||offset>=text.length)return;
+     loading=true;
+     const frag=document.createDocumentFragment();
+     for(let n=0;n<3&&offset<text.length;n++){
+       let end=Math.min(text.length,offset+64_000);
+       if(end<text.length){
+         const cut=text.lastIndexOf('\n',end);
+         if(cut>offset+32_000)end=cut+1;
+       }
+       const part=E('pre','fg-document-code fg-raw-text',text.slice(offset,end));
+       frag.appendChild(part);offset=end;
+     }
+     sheet.appendChild(frag);loading=false;
+   }
+   append();
+   let ticking=false;
+   body.addEventListener('scroll',()=>{
+     if(ticking)return;ticking=true;
+     requestAnimationFrame(()=>{
+       ticking=false;
+       if(body.scrollTop+body.clientHeight>body.scrollHeight-1000)append();
+     });
+   },{passive:true});
+ }
+ body.appendChild(sheet);stage(bar,body);
 }
 /* DOCX reads body blocks in order, keeps tables together, and scrolls without
    manufacturing pages every 150 paragraphs. Windows are lazily appended. */
@@ -156,17 +290,14 @@ function docx(){
  sheet.setAttribute('aria-label',doc.name||'Word document');
  const progress=E('span','fg-reader-counter','');
  const message=E('div','fg-docx-message','');
- const more=button('Load more ↓',()=>appendNext());
  const foot=E('div','fg-docx-foot');
- foot.append(progress,more);
+ foot.append(progress);
  body.append(sheet,foot);
  let next=0,start=0,loading=false,lastSearch=0;
  const chunk=24;
  function updateProgress(){
    const done=Math.min(count,next);
    progress.textContent=count?done+' / '+count+' blocks':'Empty document';
-   more.disabled=next>=count;
-   more.classList.toggle('hidden',next>=count);
  }
  function appendNext(){
    if(loading||next>=count)return;
@@ -188,7 +319,6 @@ function docx(){
      message.textContent=start?'Showing from document block '+(start+1):'';
    }catch(e){
      message.textContent='Cannot render this section: '+String(e.message||e);
-     more.disabled=true;
    }finally{loading=false;updateProgress();}
  }
  function showFrom(index){
@@ -240,44 +370,154 @@ function docx(){
    scheduled=true;
    requestAnimationFrame(()=>{
      scheduled=false;
-     if(body.scrollTop+body.clientHeight>=body.scrollHeight-850)appendNext();
+     if(body.scrollTop+body.clientHeight>=body.scrollHeight-850){
+       appendNext();
+       requestAnimationFrame(fillViewport);
+     }
    });
  },{passive:true});
  stage(bar,body);
  // DOCX editing exists, but accidental Save in reader mode is not offered.
  if($('saveBtn'))$('saveBtn').disabled=true;
  if($('copyBtn'))$('copyBtn').disabled=true;
- requestAnimationFrame(()=>{
-   if(body.scrollHeight<=body.clientHeight+350)appendNext();
- });
-}
-function archive(){
- let entries=[];try{entries=JSON.parse(bridge()?.getArchiveEntries?.()||'[]');}catch(_){}
- if(doc.format==='cbz')entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(e.name));
- archiveIndex=Math.min(archiveIndex,Math.max(0,entries.length-1));
- const [bar,tools]=toolbar(doc.format==='cbz'?'Comic / sequential images':'Archive explorer');
- if(!entries.length){const body=E('div','fg-reader-scroll');body.appendChild(E('p','fg-reader-empty','Archive has no previewable entries.'));stage(bar,body);return;}
- const prev=button('‹',()=>{archiveIndex=Math.max(0,archiveIndex-1);archive();});prev.disabled=archiveIndex===0;
- const next=button('›',()=>{archiveIndex=Math.min(entries.length-1,archiveIndex+1);archive();});next.disabled=archiveIndex===entries.length-1;
- tools.append(prev,E('span','fg-reader-counter',(archiveIndex+1)+' / '+entries.length),next);
- if(doc.format!=='cbz'){
-   const chooser=E('select','fg-entry-select');chooser.setAttribute('aria-label','Select archive entry');
-   entries.forEach((entry,index)=>{const option=document.createElement('option');option.value=index;option.textContent=entry.name;chooser.appendChild(option);});
-   chooser.value=archiveIndex;chooser.onchange=()=>{archiveIndex=+chooser.value;archive();};tools.appendChild(chooser);
+ function fillViewport(){
+   if(next>=count||loading)return;
+   if(body.scrollHeight<=body.clientHeight+400){
+     const before=next;
+     appendNext();
+     if(next>before)requestAnimationFrame(fillViewport);
+   }
  }
- const body=E('div','fg-reader-scroll'),p=paper('fg-archive-sheet'),entry=entries[archiveIndex];
- p.appendChild(E('h2','fg-document-h2',entry.name));
- if(entry.preview){
-   let data='';try{data=bridge()?.getArchiveEntryBase64?.(entry.name)||'';}catch(_){}
-   if(data&&/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(entry.name)){
-     const im=E('img','fg-archive-img');im.alt=entry.name;
-     const ext=entry.name.substring(entry.name.lastIndexOf('.')+1).toLowerCase();
-     im.src='data:image/'+(ext==='jpg'?'jpeg':ext)+';base64,'+data;p.appendChild(im);
-   }else if(data){try{p.appendChild(E('pre','fg-document-code',new TextDecoder().decode(decode(data))));}
-     catch(_){p.appendChild(E('p','fg-reader-empty','Cannot decode this entry.'));}}
-   else p.appendChild(E('p','fg-reader-empty','Entry is too large or unsupported for inline preview.'));
- }else p.appendChild(E('p','fg-reader-empty','This item can be listed, but not previewed safely.'));
- body.appendChild(p);stage(bar,body);
+ requestAnimationFrame(fillViewport);
+}
+/* Comics and archives are content streams, not one-entry slide decks. */
+function archive(){
+ let entries=[];
+ try{entries=JSON.parse(bridge()?.getArchiveEntries?.()||'[]');}catch(_){}
+ if(doc.format==='cbz')entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(e.name));
+ const [bar,tools]=toolbar(doc.format==='cbz'?
+    'Continuous comic · scroll down through every image':
+    'Archive contents · scroll and expand entries');
+ const body=E('div','fg-reader-scroll fg-archive-scroll');
+ body.setAttribute('role','document');
+ tools.appendChild(E('span','fg-reader-counter',entries.length+' entries'));
+ if(!entries.length){
+   body.appendChild(E('p','fg-reader-empty','Archive has no previewable entries.'));
+   stage(bar,body);return;
+ }
+ function content(entry,dest){
+   dest.replaceChildren();
+   if(!entry.preview){
+     dest.appendChild(E('p','fg-reader-empty','This entry cannot be previewed safely.'));
+     return;
+   }
+   try{
+     const data=bridge()?.getArchiveEntryBase64?.(entry.name)||'';
+     if(!data)throw Error('Entry exceeds preview limit or is not readable.');
+     if(/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(entry.name)){
+       const ext=entry.name.split('.').pop().toLowerCase();
+       const im=E('img','fg-archive-img');im.alt=entry.name;
+       im.loading='lazy';
+       im.src='data:image/'+(ext==='jpg'?'jpeg':ext)+';base64,'+data;
+       dest.appendChild(im);
+     }else{
+       dest.appendChild(E('pre','fg-document-code',
+         new TextDecoder().decode(decode(data))));
+     }
+   }catch(error){
+     dest.appendChild(E('p','fg-reader-empty',
+       'Cannot preview '+entry.name+': '+String(error.message||error)));
+   }
+ }
+ if(doc.format==='cbz'){
+   const stack=E('div','fg-pdf-stack fg-comic-stack'),cells=[],loaded=new Map();
+   let disposed=false,observer=null,scheduled=false;
+   const queue=new Set();
+   const root=E('div','fg-pdf-container');
+   function enqueue(i){
+     if(disposed||loaded.has(i)||queue.has(i))return;
+     queue.add(i);
+     if(!scheduled){scheduled=true;requestAnimationFrame(draw);}
+   }
+   function draw(){
+     scheduled=false;
+     if(disposed||!queue.size)return;
+     const i=queue.values().next().value;queue.delete(i);
+     const frame=cells[i],rect=frame.getBoundingClientRect(),view=body.getBoundingClientRect();
+     if(rect.bottom>=view.top-2*body.clientHeight&&rect.top<=view.bottom+2*body.clientHeight){
+       const target=E('div','fg-comic-page');
+       content(entries[i],target);
+       frame.replaceChildren(target);loaded.set(i,target);
+     }
+     trim();
+     if(queue.size){scheduled=true;requestAnimationFrame(draw);}
+   }
+   function trim(){
+     const view=body.getBoundingClientRect();
+     for(const [i,target] of loaded){
+       const rect=cells[i].getBoundingClientRect();
+       if(rect.bottom<view.top-3*body.clientHeight||
+          rect.top>view.bottom+3*body.clientHeight){
+         target.querySelectorAll('img').forEach(img=>img.removeAttribute('src'));
+         loaded.delete(i);
+         cells[i].replaceChildren(E('div','fg-pdf-skeleton','Image '+(i+1)));
+       }
+     }
+   }
+   entries.forEach((entry,i)=>{
+     const frame=E('section','fg-comic-section');
+     frame.dataset.page=String(i+1);
+     frame.setAttribute('aria-label','Comic image '+(i+1)+' '+entry.name);
+     frame.appendChild(E('div','fg-pdf-skeleton','Image '+(i+1)));
+     root.appendChild(frame);cells.push(frame);
+   });
+   stack.appendChild(root);body.appendChild(stack);stage(bar,body);
+   if(window.IntersectionObserver){
+     observer=new IntersectionObserver(items=>{
+       for(const item of items)if(item.isIntersecting)
+         enqueue(Number(item.target.dataset.page)-1);
+     },{root:body,rootMargin:'90% 0px'});
+     cells.forEach(c=>observer.observe(c));
+   }
+   let raf=0;
+   body.addEventListener('scroll',()=>{
+     if(raf)return;
+     raf=requestAnimationFrame(()=>{
+       raf=0;trim();
+       if(!observer){
+         const top=body.getBoundingClientRect().top;
+         cells.forEach((c,i)=>{
+           const rect=c.getBoundingClientRect();
+           if(rect.bottom>=top-body.clientHeight&&rect.top<=top+2*body.clientHeight)enqueue(i);
+         });
+       }
+     });
+   },{passive:true});
+   enqueue(0);if(entries.length>1)enqueue(1);
+   activeReaderCleanup=()=>{
+     disposed=true;observer?.disconnect();queue.clear();
+     if(raf)cancelAnimationFrame(raf);
+     for(const cell of loaded.values())
+       cell.querySelectorAll('img').forEach(img=>img.removeAttribute('src'));
+     loaded.clear();
+   };
+ }else{
+   const list=E('div','fg-archive-list');
+   entries.forEach((entry,i)=>{
+     const row=E('details','fg-archive-entry');
+     const summary=E('summary','fg-archive-summary',
+       (entry.name||'Entry '+(i+1))+
+       (entry.size>=0?' · '+(Math.round(entry.size/1024))+' KiB':''));
+     const dest=E('div','fg-archive-preview');
+     row.append(summary,dest);
+     row.addEventListener('toggle',()=>{
+       if(row.open)content(entry,dest);
+       else {dest.querySelectorAll('img').forEach(im=>im.removeAttribute('src'));dest.replaceChildren();}
+     });
+     list.appendChild(row);
+   });
+   body.appendChild(list);stage(bar,body);
+ }
 }
 function binary(){
  const [bar]=toolbar('Unknown or legacy binary document · inspection only');
@@ -300,6 +540,7 @@ function backButton(){
 }
 window.loadDocument=function(d){
  if(assetUrl){URL.revokeObjectURL(assetUrl);assetUrl=null;}
+ if(activeReaderCleanup){activeReaderCleanup();activeReaderCleanup=null;}
  doc=d;page=0;zoom=1;archiveIndex=0;editing=false;
  $('editor')?.classList.remove('fg-reader-host');backButton().classList.add('hidden');
  original(d);

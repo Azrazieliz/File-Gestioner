@@ -80,6 +80,7 @@ jobs:
           python3 ../hotfixes/apply-universal-reader-ui.py
           python3 ../hotfixes/apply-docx-flow-editor.py
           python3 ../hotfixes/apply-3d-asset-viewer.py
+          python3 ../hotfixes/apply-continuous-reader-css.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -103,6 +104,9 @@ jobs:
           grep -Fq 'model/*' app/src/main/AndroidManifest.xml
           bash ../hotfixes/test-rich-docx-reader.sh
           node --check app/src/main/assets/universal-reader.js
+          node ../hotfixes/test-continuous-reader.cjs
+          grep -Fq 'getPdfPageMetrics' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'File Gestioner 0.10.2' app/src/main/assets/style.css
           grep -Fq 'getPdfPage' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'UniversalReader.extractDocument' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'LegacyOfficeReader.read' app/src/main/java/com/openlocal/office/MainActivity.java
@@ -230,8 +234,8 @@ jobs:
             sleep 3
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "File Gestioner failed to launch"; exit 1; }
             mkdir -p screenshots
-            adb shell screencap -p /sdcard/fg-reader-home.png
-            adb pull /sdcard/fg-reader-home.png screenshots/fg-reader-home.png
+            adb exec-out screencap -p > screenshots/fg-reader-home.png
+            test -s screenshots/fg-reader-home.png
             adb logcat -b crash -d | tee screenshots/crash-log.txt
             if grep -q 'FATAL EXCEPTION' screenshots/crash-log.txt; then exit 1; fi
 

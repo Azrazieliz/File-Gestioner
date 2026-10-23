@@ -39,6 +39,26 @@ public final class UniversalReader {
         }
     }
 
+    /** Native page geometry lets the continuous reader reserve correct aspect
+     * ratios before rasterizing visible pages (landscape and mixed PDFs). */
+    public static String pdfPageMetrics(Context ctx, Uri uri) throws IOException {
+        try (ParcelFileDescriptor fd=ctx.getContentResolver().openFileDescriptor(uri,"r")) {
+            if(fd==null)throw new IOException("The PDF cannot be opened.");
+            try(PdfRenderer pdf=new PdfRenderer(fd)) {
+                int count=pdf.getPageCount();
+                if(count>10000)throw new IOException("The PDF exceeds the reader's page-count limit");
+                StringBuilder json=new StringBuilder("[");
+                for(int i=0;i<count;i++) {
+                    if(i>0)json.append(',');
+                    try(PdfRenderer.Page p=pdf.openPage(i)) {
+                        json.append('[').append(p.getWidth()).append(',').append(p.getHeight()).append(']');
+                    }
+                }
+                return json.append(']').toString();
+            }
+        }
+    }
+
     public static String pdfPage(Context ctx, Uri uri, int pageIndex, int targetWidth) throws IOException {
         try(ParcelFileDescriptor fd=ctx.getContentResolver().openFileDescriptor(uri, "r")) {
             if(fd==null)throw new IOException("Cannot read PDF.");
