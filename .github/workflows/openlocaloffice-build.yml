@@ -82,6 +82,8 @@ jobs:
           python3 ../hotfixes/apply-3d-asset-viewer.py
           python3 ../hotfixes/apply-continuous-reader-css.py
           python3 ../hotfixes/apply-professional-pdf-ui.py
+          cp ../additions/unified-viewer-controls.js app/src/main/assets/unified-viewer-controls.js
+          python3 ../hotfixes/apply-unified-reader-experience.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -105,7 +107,13 @@ jobs:
           grep -Fq 'model/*' app/src/main/AndroidManifest.xml
           bash ../hotfixes/test-rich-docx-reader.sh
           node --check app/src/main/assets/universal-reader.js
+          node --check app/src/main/assets/unified-viewer-controls.js
           node ../hotfixes/test-continuous-reader.cjs
+          node --check app/src/main/assets/unified-viewer-controls.js
+          node ../hotfixes/test-unified-reader.cjs
+          grep -Fq 'unified-viewer-controls.js' app/src/main/assets/index.html
+          grep -Fq 'File Gestioner 0.11' app/src/main/assets/style.css
+          grep -Fq "actions.append(q('−'" app/src/main/assets/model-viewer.entry.js
           grep -Fq 'fg-pdf-reading' app/src/main/assets/universal-reader.js
           grep -Fq 'File Gestioner 0.10.3' app/src/main/assets/style.css
           grep -Fq 'Math.min(2400,targetWidth)' app/src/main/java/com/openlocal/office/core/UniversalReader.java
