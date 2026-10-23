@@ -17,8 +17,8 @@ need(u.includes('numeric:true'),'ZIP reader must sort 1,2,10 not 1,10,2');
 need(u.includes("isComic?'Files':'Read images'"),'ZIP images must have optional list mode');
 need(controls.includes("doc.comicMode===true"),'ZIP comic must inherit CBZ-style zoom gestures');
 // Round Sync/TeraBox SAF: do not mirror the AsterionCore temporary-file issue.
-need(b.includes('Os.lseek(handle.getFileDescriptor()'),'SAF fd must be checked for random access');
-need(b.includes('if(seekable){'),'A seekable provider must not be copied again on ZIP error');
+need(b.includes('new SeekableZip(handle)'),'SAF fd must use direct random-access ZIP index');
+need(b.includes('if(seekable)throw new IOException('),'Seekable providers must not be copied after ZIP index failure');
 need(b.includes('if(advertised>0&&physical>=0&&physical<advertised)'),
   'Known incomplete cloud files must be rejected before a second copy');
 need(b.includes('if(advertised>0&&copied!=advertised)'),
