@@ -60,7 +60,7 @@ java.write_text(j)
 j=java.read_text()
 source_anchor='                if ("pdf".equals(quickType)) {'
 assert source_anchor in j
-j=j.replace(source_anchor,'''                if (Arrays.asList("blend","blend1","unity3d","assetbundle","zipmod").contains(quickType)) {
+j=j.replace(source_anchor,r'''                if (Arrays.asList("blend","blend1","unity3d","assetbundle","zipmod").contains(quickType)) {
                     xlsx=null; csv=null; docx=null; sdocx=null;
                     rawDocument=null; textDocument=null;
                     currentUri=uri; currentName=name; currentType=quickType;
