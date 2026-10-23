@@ -31,11 +31,7 @@ replace_once('                long size = displaySize(uri);',
                     return;
                 }
                 long size = displaySize(uri);''')
-replace_once('                } else if ("doc".equals(type)) {
-                    textDocument=LegacyOfficeReader.read(bytes,"doc");
-                    currentType="doc"; currentMime=mimeForPreview(type);
-                    json = readerJson(name,type,textDocument.length());
-                } else if ("xls".equals(type)) {',
+replace_once('                } else if ("xls".equals(type)) {',
 '''                } else if ("epub".equals(type) ||
                            "odt".equals(type) || "ods".equals(type) || "odp".equals(type)) {
                     textDocument = UniversalReader.extractDocument(bytes,type);
@@ -66,6 +62,10 @@ replace_once('                } else if ("doc".equals(type)) {
                     }
                     currentType=type; currentMime=mimeForPreview(type);
                     json=readerJson(name,type,textDocument.length());
+                } else if ("doc".equals(type)) {
+                    textDocument=LegacyOfficeReader.read(bytes,"doc");
+                    currentType="doc"; currentMime=mimeForPreview(type);
+                    json = readerJson(name,type,textDocument.length());
                 } else if ("xls".equals(type)) {''')
 replace_once('                    throw new IOException("Legacy .xls is not included in this offline build. Save it as .xlsx first.");',
 '''                    textDocument=LegacyOfficeReader.read(bytes,"xls");
