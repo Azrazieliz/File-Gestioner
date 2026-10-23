@@ -19,11 +19,6 @@ function stage(t,content,hasTextSearch=false){
  document.querySelector('.searchbar')?.classList.toggle('hidden',!hasTextSearch);
  if(ro(doc)){$('saveBtn').disabled=true;$('copyBtn').disabled=true;}
 }
-function zoomer(bar,render){
- bar.append(button('−',()=>{zoom=Math.max(.7,zoom-.15);render();}),
-  E('span','fg-reader-counter',Math.round(zoom*100)+'%'),
-  button('+',()=>{zoom=Math.min(2.3,zoom+.15);render();}));
-}
 function decode(encoded){
  const bin=atob(encoded),out=new Uint8Array(bin.length);
  for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);
@@ -266,12 +261,11 @@ function pdf(){
 }
 function imageView(){
  const [bar,tools]=toolbar('Image preview · pinch/scroll to inspect');
- zoomer(tools,imageView);
  const body=E('div','fg-reader-scroll fg-image-surface'),img=E('img','fg-display-image');
  const formats={jpg:'jpeg',jpeg:'jpeg',png:'png',webp:'webp',gif:'gif',avif:'avif',bmp:'bmp',heic:'heic',heif:'heif'};
  try{
   if(!assetUrl)assetUrl=URL.createObjectURL(new Blob([localBytes()],{type:'image/'+(formats[doc.format]||'jpeg')}));
-  img.src=assetUrl;img.alt=doc.name;img.style.width='min(100%, '+Math.round(850*zoom)+'px)';
+  img.src=assetUrl;img.alt=doc.name;img.style.width='100%';
   img.onerror=()=>{body.replaceChildren(E('p','fg-reader-empty','This image codec is unsupported by the installed Android WebView.'));};
   body.appendChild(img);
  }catch(e){body.appendChild(E('p','fg-reader-empty',String(e.message||e)));}
@@ -325,12 +319,6 @@ function textView(){
  const sheet=paper('fg-document-sheet fg-continuous-text');
  sheet.setAttribute('role','document');
  sheet.setAttribute('aria-label',doc.name||'Document');
- let size=1;
- const setSize=delta=>{
-   size=Math.max(.75,Math.min(2,Math.round((size+delta)*100)/100));
-   sheet.style.setProperty('--fg-size',String(size));
- };
- tools.append(button('A−',()=>setSize(-.1)),button('A+',()=>setSize(.1)));
  if(text.length<=2_000_000) {
    addLines(sheet,text,doc.format);
  } else {
@@ -416,14 +404,6 @@ function docx(){
  const begin=button('↑ Start',()=>{lastSearch=0;showFrom(0);});
  begin.title='Return to the beginning of the document';
  tools.appendChild(begin);
- tools.appendChild(button('A−',()=>{
-   zoom=Math.max(.78,Math.round((zoom-.1)*100)/100);
-   sheet.style.setProperty('--fg-size',String(zoom));
- }));
- tools.appendChild(button('A+',()=>{
-   zoom=Math.min(1.8,Math.round((zoom+.1)*100)/100);
-   sheet.style.setProperty('--fg-size',String(zoom));
- }));
  const searchInput=E('input','fg-reader-find');
  searchInput.type='search';searchInput.placeholder='Find in document';
  searchInput.setAttribute('aria-label','Find in entire Word document');
