@@ -79,6 +79,19 @@ jobs:
           python3 ../hotfixes/apply-universal-reader-backend.py
           python3 ../hotfixes/apply-universal-reader-ui.py
           python3 ../hotfixes/apply-docx-flow-editor.py
+          python3 ../hotfixes/apply-3d-asset-viewer.py
+          # Bundle source-pinned, vendored Three.js; NO runtime CDN or model upload.
+          mkdir -p app/src/main/assets/three-vendor
+          cp -R ../three-vendor/. app/src/main/assets/three-vendor/
+          cp ../additions/model-viewer.entry.js app/src/main/assets/model-viewer.entry.js
+          npx --yes esbuild@0.25.12 app/src/main/assets/model-viewer.entry.js \
+            --bundle --minify --format=iife --target=chrome110 --legal-comments=eof \
+            --outfile=app/src/main/assets/model-viewer.bundle.js
+          test -s app/src/main/assets/model-viewer.bundle.js
+          node --check app/src/main/assets/model-viewer.bundle.js
+          grep -Fq 'window.FileGestionerModelViewer=' app/src/main/assets/model-viewer.entry.js
+          grep -Fq 'model3d' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'model/*' app/src/main/AndroidManifest.xml
           bash ../hotfixes/test-rich-docx-reader.sh
           node --check app/src/main/assets/universal-reader.js
           grep -Fq 'getPdfPage' app/src/main/java/com/openlocal/office/MainActivity.java
