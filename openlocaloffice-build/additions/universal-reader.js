@@ -49,6 +49,12 @@ function pdf(){
  const cells=[],loaded=new Map(),queued=new Set();
  let metrics=[],observer=null,disposed=false,renderScheduled=false,scrollFrame=0;
  let readingPage=0,scale=1,qualityTimer=0,pinch=null;
+ const zoomKey='fg.pdf.zoom.v1.'+String(doc.name||'');
+ let savedZoom=1;
+ try {
+   const v=Number(localStorage.getItem(zoomKey));
+   if(Number.isFinite(v)&&v>=.65&&v<=4)savedZoom=v;
+ }catch(_){} 
  try{metrics=JSON.parse(b?.getPdfPageMetrics?.()||'[]');}
  catch(_){metrics=[];}
  if(!Array.isArray(metrics))metrics=[];
@@ -166,7 +172,10 @@ function pdf(){
    body.scrollLeft=Math.max(0,anchorX*scale-fx);
    body.scrollTop=Math.max(0,anchorY*scale-fy);
    updatePage();
-   if(!interactive)queueSharpen();
+   if(!interactive){
+     try{localStorage.setItem(zoomKey,String(scale));}catch(_){}
+     queueSharpen();
+   }
  }
  for(let i=0;i<count;i++){
    const data=metrics[i],w=Number(data?.[0]),h=Number(data?.[1]);
@@ -181,6 +190,7 @@ function pdf(){
  if(!count)pages.appendChild(E('p','fg-reader-empty','This PDF is empty.'));
  stage(bar,body);
  document.body.classList.add('fg-pdf-reading');
+ if(Math.abs(savedZoom-1)>.005)changeZoom(savedZoom);
  // Gesture scale never invokes the native renderer inside touchmove.
  const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
  const focal=(a,b)=>{
@@ -204,7 +214,11 @@ function pdf(){
  let lastTouchTime=0,lastTouchPoint=null,suppressTap=false;
  const onTouchEnd=e=>{
    if(pinch){
-     if(e.touches.length<2){suppressTap=pinch.moved;pinch=null;queueSharpen();}
+     if(e.touches.length<2){
+       suppressTap=pinch.moved;pinch=null;
+       try{localStorage.setItem(zoomKey,String(scale));}catch(_){}
+       queueSharpen();
+     }
      return;
    }
    if(e.touches.length||e.changedTouches.length!==1)return;
