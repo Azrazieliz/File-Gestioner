@@ -25,7 +25,8 @@ repl(java,
     '    private static boolean isImageType(String type) {',
     '''    private static boolean isModelType(String type) {
         return Arrays.asList("glb","gltf","obj","fbx","stl","ply",
-            "dae","3mf","3ds","amf","usdz","usda","usdc").contains(type);
+            "dae","3mf","3ds","amf","usdz","usda","usdc",
+            "blend","blend1","unity3d","assetbundle","zipmod").contains(type);
     }
     private static String modelMime(String type) {
         if ("glb".equals(type))return "model/gltf-binary";
@@ -52,6 +53,26 @@ repl(java,
         if("application/msword".equals(m))return "doc";''')
 # Correct a stale 40 MiB message; actual global bound is 80 MiB.
 j=java.read_text().replace("larger than 40 MB","larger than 80 MiB")
+java.write_text(j)
+
+# Native Blender and Koikatsu bundles can be gigabytes. Report them without
+# loading all their bytes into Java / WebView.
+j=java.read_text()
+source_anchor='                if ("pdf".equals(quickType)) {'
+assert source_anchor in j
+j=j.replace(source_anchor,'''                if (Arrays.asList("blend","blend1","unity3d","assetbundle","zipmod").contains(quickType)) {
+                    xlsx=null; csv=null; docx=null; sdocx=null;
+                    rawDocument=null; textDocument=null;
+                    currentUri=uri; currentName=name; currentType=quickType;
+                    currentMime="application/octet-stream";
+                    remember(uri,name,currentMime);
+                    String payload="{\"type\":\"model3d\",\"name\":"+q(name)+
+                        ",\"format\":"+q(quickType)+
+                        ",\"requiresConversion\":true,\"readOnly\":true}";
+                    runOnUiThread(() -> js("window.loadDocument(" + payload + ")"));
+                    return;
+                }
+'''+source_anchor,1)
 java.write_text(j)
 
 repl(js,"const ro=d=>['pdf','image','reader','archive','binary'].includes(d?.type)",
@@ -125,6 +146,17 @@ css.write_text(css.read_text()+r"""
   .fg-3d-button{min-height:35px;padding:5px 9px}
 }
 """)
+css.write_text(css.read_text()+r"""
+/* NoWorld source provenance read-only panel */
+.fg-3d-noworld{display:flex;flex-direction:column;gap:6px;background:#17253b;
+ color:#e9f2ff;border-top:1px solid #45607d;padding:11px 14px;font:12px/1.5 system-ui}
+.fg-3d-noworld-title{font-weight:750;color:#c4d7fd;font-size:13px}
+.fg-3d-noworld-grid{display:grid;grid-template-columns:minmax(84px,115px) 1fr;
+ gap:4px 10px;word-break:break-word}
+.fg-3d-noworld-key{color:#9fb2cb}
+.fg-3d-noworld-value{color:#eef2fa}
+""")
+
 # Make this a real Android upgrade beyond the 0.9 build's versionCode.
 gradle=Path("app/build.gradle.kts")
 g=gradle.read_text()
