@@ -213,7 +213,7 @@ function docx(){
  const findAction=()=>{
    const term=searchInput.value.trim();
    if(!term)return;
-   const target=Number(b?.findDocxBlock?.(term,lastSearch)||-1);
+   const target=Number(b?.findDocxBlock?.(term,lastSearch)??-1);
    if(target<0){message.textContent='No matching text found';return;}
    lastSearch=target+1;
    let node=sheet.querySelector('[data-index="'+target+'"]');
