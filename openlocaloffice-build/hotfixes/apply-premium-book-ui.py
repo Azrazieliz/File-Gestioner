@@ -14,6 +14,11 @@ sheet=css.read_text()
 sheet+=r"""
 
 /* File Gestioner · premium EPUB long-form reading, not ZIP-to-plaintext */
+body.fg-book-mode .bar{display:none!important}
+body.fg-book-mode .work{height:100dvh!important;min-height:0!important}
+body.fg-book-mode #editor.fg-reader-host{height:100%!important;flex:1 1 auto}
+.fg-book-back{min-width:36px;min-height:36px;padding:5px 9px!important;font-size:23px!important;border:0!important}
+
 body.fg-book-mode{background:#0d1016}
 body.fg-book-mode #editor.fg-reader-host{padding:0!important;min-height:0}
 body.fg-book-mode .bar{height:51px;min-height:51px;padding:5px 13px;
