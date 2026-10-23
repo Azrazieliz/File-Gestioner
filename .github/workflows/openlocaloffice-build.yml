@@ -73,6 +73,7 @@ jobs:
           ./scripts/check-android-java.sh
           ./scripts/test-core.sh
           cp ../additions/UniversalReader.java app/src/main/java/com/openlocal/office/core/UniversalReader.java
+          cp ../additions/RichDocxPreview.java app/src/main/java/com/openlocal/office/core/RichDocxPreview.java
           cp ../additions/universal-reader.js app/src/main/assets/universal-reader.js
           python3 ../hotfixes/apply-universal-reader-backend.py
           python3 ../hotfixes/apply-universal-reader-ui.py
