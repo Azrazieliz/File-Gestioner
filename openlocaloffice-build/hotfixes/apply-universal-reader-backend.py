@@ -178,6 +178,8 @@ manifest=MANIFEST.read_text()
 anchor='<data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />'
 assert anchor in manifest
 manifest=manifest.replace(anchor,anchor+'''
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/vnd.ms-excel" />
                 <data android:mimeType="application/pdf" />
                 <data android:mimeType="application/epub+zip" />
                 <data android:mimeType="application/vnd.oasis.opendocument.text" />
@@ -190,6 +192,9 @@ MANIFEST.write_text(manifest)
 gradle=Path("app/build.gradle.kts")
 if gradle.exists():
     build=gradle.read_text()
+    if "org.apache.poi:poi-scratchpad:" not in build:
+        assert "dependencies {" in build
+        build=build.replace("dependencies {", "dependencies {\n    implementation(\"org.apache.poi:poi-scratchpad:5.4.1\")",1)
     build=re.sub(r'versionCode\s*=\s*(\d+)',lambda m:'versionCode = '+str(int(m.group(1))+1),build,count=1)
     build=re.sub(r'versionName\s*=\s*"[^"]+"','versionName = "0.9.0"',build,count=1)
     gradle.write_text(build)
