@@ -37,8 +37,8 @@ repl(java,
     }
     private static boolean isImageType(String type) {''')
 repl(java,
-    '               isImageType(currentType) || isTextType(currentType)) {',
-    '               isImageType(currentType) || isTextType(currentType) || isModelType(currentType)) {')
+    '              isImageType(currentType) || isTextType(currentType)) {',
+    '              isImageType(currentType) || isTextType(currentType) || isModelType(currentType)) {')
 repl(java,
     '             isImageType(ext) || isTextType(ext)))return ext;',
     '             isImageType(ext) || isTextType(ext) || isModelType(ext)))return ext;')
