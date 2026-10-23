@@ -37,7 +37,7 @@ const mockWindow={
     switch(d.type){
       case 'spreadsheet':current['.editorGridWrap']=scroll;current['table.sheet']=target;break;
       case 'sdocx':current['#sdocxEditor']=target;break;
-      case 'docx':current['.fg-docx-scroll']=scroll;current['.fg-docx-sheet']=target;break;
+      case 'docx':target.className='fg-docx-sheet';target.classList.add('fg-docx-sheet');current['.fg-docx-scroll']=scroll;current['.fg-docx-sheet']=target;break;
       case 'reader':current['.fg-text-scroll']=scroll;current['.fg-continuous-text']=target;break;
       case 'image':current['.fg-image-surface']=scroll;current['.fg-display-image']=target;break;
       case 'archive':
