@@ -38,142 +38,228 @@ function localBytes(){
  for(const c of chunks){out.set(c,pos);pos+=c.length;}
  return out;
 }
-/* Continuous PDFs: one vertical document, native aspect-ratio placeholders,
-   render only pages approaching the viewport and free distant bitmaps. */
+/* File Gestioner mobile PDF reading surface.
+   One natural scrolling document; actual layout zoom, pinch gestures and
+   anchored two-dimensional panning, never a PDF-as-slideshow carousel. */
 let activeReaderCleanup=null;
 function pdf(){
- const b=bridge();
- const count=Math.max(0,Number(doc.pages)||0);
- const [bar,tools]=toolbar('Continuous PDF · swipe vertically');
+ const b=bridge(),count=Math.max(0,Number(doc.pages)||0);
+ const [bar,tools]=toolbar('');bar.classList.add('fg-pdf-toolbar');
  const body=E('div','fg-reader-scroll fg-pdf-scroll');
  body.setAttribute('role','document');
- body.setAttribute('aria-label',(doc.name||'PDF')+' · '+count+' pages');
- const stack=E('div','fg-pdf-stack');
- const refs=[],loaded=new Map(),waiting=new Set();
- let metrics=[],observer=null,disposed=false,scheduled=false,readingPage=0,zoomValue=1;
- try{metrics=JSON.parse(b?.getPdfPageMetrics?.()||'[]');}catch(_){}
+ body.setAttribute('aria-label',(doc.name||'PDF')+' — '+count+' pages');
+ body.setAttribute('tabindex','0');
+ const stack=E('div','fg-pdf-stack'),pages=E('div','fg-pdf-container');
+ stack.appendChild(pages);body.appendChild(stack);
+ const cells=[],loaded=new Map(),queued=new Set();
+ let metrics=[],observer=null,disposed=false,renderScheduled=false,scrollFrame=0;
+ let readingPage=0,scale=1,qualityTimer=0,pinch=null;
+ try{metrics=JSON.parse(b?.getPdfPageMetrics?.()||'[]');}
+ catch(_){metrics=[];}
  if(!Array.isArray(metrics))metrics=[];
- const progress=E('span','fg-reader-counter fg-pdf-progress',
-   count?'Page 1 of '+count:'Empty PDF');
- progress.setAttribute('aria-live','off');
- const zoomLabel=E('span','fg-reader-counter','Fit width');
- const container=E('div','fg-pdf-container');
- stack.appendChild(container);
- body.appendChild(stack);
- function widthPx(){return Math.max(360,Math.min(1500,
-     Math.round(Math.max(360,body.clientWidth-20)*(window.devicePixelRatio||1)*zoomValue)));}
- function put(index){
-   if(disposed||loaded.has(index)||waiting.has(index)||index<0||index>=count)return;
-   waiting.add(index);
-   if(!scheduled){scheduled=true;requestAnimationFrame(drawNext);}
+ const progress=E('span','fg-reader-counter fg-pdf-progress',count?'1 / '+count:'0 pages');
+ progress.setAttribute('aria-label','Current PDF page');
+ const percent=button('100%',()=>changeZoom(1));
+ percent.classList.add('fg-pdf-percent');
+ percent.setAttribute('aria-label','Reset zoom to fit width');
+ const minus=button('−',()=>changeZoom(scale/1.25));
+ const plus=button('+',()=>changeZoom(scale*1.25));
+ const fit=button('Fit',()=>changeZoom(1));
+ minus.setAttribute('aria-label','Zoom out');
+ plus.setAttribute('aria-label','Zoom in');
+ fit.setAttribute('aria-label','Fit PDF to screen width');
+ const pageLabel=E('span','fg-pdf-page-label','Page');
+ tools.append(pageLabel,progress,minus,percent,plus,fit);
+ function targetWidth(){
+   return Math.max(400,Math.min(2400,
+     Math.round(Math.max(body.clientWidth,320)*(window.devicePixelRatio||1)*scale)));
  }
- function drawNext(){
-   scheduled=false;
+ function skeleton(i){
+   return E('div','fg-pdf-skeleton','Page '+(i+1));
+ }
+ function release(i){
+   const old=loaded.get(i);
+   if(old?.img)old.img.removeAttribute('src');
+   loaded.delete(i);
+   cells[i]?.replaceChildren(skeleton(i));
+ }
+ function request(i,force=false){
+   if(disposed||i<0||i>=count||queued.has(i))return;
+   const item=loaded.get(i);
+   const target=targetWidth();
+   if(!force&&item&&item.pixels>=target*.82&&item.pixels<=target*1.8)return;
+   queued.add(i);
+   if(!renderScheduled){renderScheduled=true;requestAnimationFrame(renderNext);}
+ }
+ function renderNext(){
+   renderScheduled=false;
    if(disposed)return;
-   const iterator=waiting.values(),next=iterator.next();
-   if(next.done)return;
-   const index=next.value;waiting.delete(index);
-   const cell=refs[index];
-   if(!cell)return;
-   // Never do expensive bridge PDF rendering for pages now far from view.
-   const viewport=body.getBoundingClientRect(),bounds=cell.getBoundingClientRect();
-   if(bounds.bottom<viewport.top-2*body.clientHeight ||
-      bounds.top>viewport.bottom+2*body.clientHeight){
-     if(waiting.size){scheduled=true;requestAnimationFrame(drawNext);}return;
-   }
-   try{
-     const data=b?.getPdfPage?.(index,widthPx());
-     if(!data)throw Error('The page could not be rendered.');
-     const img=E('img','fg-pdf-img');
-     img.alt='Page '+(index+1)+' of '+count;
-     img.decoding='async';
-     img.src='data:image/jpeg;base64,'+data;
-     img.onerror=()=>{if(!disposed)cell.replaceChildren(
-       E('div','fg-reader-empty','Page '+(index+1)+' could not be displayed.'));};
-     cell.replaceChildren(img);
-     loaded.set(index,{img,pixels:widthPx()});
-   }catch(error){
-     cell.replaceChildren(E('div','fg-reader-empty',
-       'Cannot display page '+(index+1)+': '+String(error.message||error)));
-   }
-   trim();
-   if(waiting.size){scheduled=true;requestAnimationFrame(drawNext);}
- }
- function trim(){
-   const viewport=body.getBoundingClientRect();
-   for(const [i,item] of loaded){
-     const box=refs[i].getBoundingClientRect();
-     if(box.bottom<viewport.top-2.5*body.clientHeight ||
-        box.top>viewport.bottom+2.5*body.clientHeight){
-       item.img.removeAttribute('src');
-       loaded.delete(i);
-       refs[i].replaceChildren(E('div','fg-pdf-skeleton','Page '+(i+1)));
+   const item=queued.values().next();
+   if(item.done)return;
+   queued.delete(item.value);
+   const i=item.value,cell=cells[i];if(!cell)return;
+   const view=body.getBoundingClientRect(),rect=cell.getBoundingClientRect();
+   if(rect.bottom>=view.top-1.6*body.clientHeight &&
+      rect.top<=view.bottom+1.6*body.clientHeight){
+     try{
+       const pixels=targetWidth();
+       const jpg=b?.getPdfPage?.(i,pixels);
+       if(!jpg)throw Error('PDF renderer returned no image');
+       const im=E('img','fg-pdf-img');
+       im.alt='Page '+(i+1)+' of '+count;im.decoding='async';im.draggable=false;
+       im.src='data:image/jpeg;base64,'+jpg;
+       im.onerror=()=>{if(!disposed&&loaded.get(i)?.img===im){
+         loaded.delete(i);
+         cell.replaceChildren(E('p','fg-reader-empty','Unable to display page '+(i+1)));
+       }};
+       const previous=loaded.get(i);
+       cell.replaceChildren(im);
+       loaded.set(i,{img:im,pixels});
+       if(previous?.img&&previous.img!==im)previous.img.removeAttribute('src');
+     }catch(err){
+       if(!loaded.has(i))cell.replaceChildren(E('p','fg-reader-empty',
+         'Page '+(i+1)+' could not be rendered: '+String(err.message||err)));
      }
    }
- }
- function updateCurrent(){
-   if(disposed)return;
-   const center=body.getBoundingClientRect().top+Math.max(20,body.clientHeight*.3);
-   let best=readingPage,dist=Infinity;
-   for(let i=0;i<count;i++){
-     const rect=refs[i].getBoundingClientRect();
-     const d=rect.top>center?rect.top-center:rect.bottom<center?center-rect.bottom:0;
-     if(d<dist){dist=d;best=i;if(d===0)break;}
-   }
-   readingPage=best;progress.textContent='Page '+(best+1)+' of '+count;
    trim();
-   // Fallback if WebView lacks IntersectionObserver.
-   if(!observer)for(let i=Math.max(0,best-1);i<=Math.min(count-1,best+2);i++)put(i);
+   if(queued.size){renderScheduled=true;requestAnimationFrame(renderNext);}
  }
- function resizeZoom(delta,fit=false){
-   zoomValue=fit?1:Math.max(.7,Math.min(2.5,Math.round((zoomValue+delta)*100)/100));
-   stack.style.width=Math.round(zoomValue*100)+'%';
-   zoomLabel.textContent=zoomValue===1?'Fit width':Math.round(zoomValue*100)+'%';
-   for(const [i,item] of loaded){
-     item.img.removeAttribute('src');
-     loaded.delete(i);
-     refs[i].replaceChildren(E('div','fg-pdf-skeleton','Page '+(i+1)));
+ function trim(){
+   if(disposed)return;
+   const view=body.getBoundingClientRect();
+   for(const [i] of loaded){
+     const rect=cells[i].getBoundingClientRect();
+     if(rect.bottom<view.top-2.2*body.clientHeight ||
+        rect.top>view.bottom+2.2*body.clientHeight)release(i);
    }
-   updateCurrent();
-   for(let i=Math.max(0,readingPage-1);i<=Math.min(count-1,readingPage+1);i++)put(i);
  }
- tools.append(progress,
-   button('−',()=>resizeZoom(-.15)),
-   zoomLabel,button('+',()=>resizeZoom(.15)),
-   button('Fit width',()=>resizeZoom(0,true)));
+ function updatePage(){
+   if(disposed||!count)return;
+   const rect=body.getBoundingClientRect(),line=rect.top+body.clientHeight*.34;
+   let match=readingPage,min=Infinity;
+   for(let i=0;i<count;i++){
+     const r=cells[i].getBoundingClientRect();
+     const d=line<r.top?r.top-line:line>r.bottom?line-r.bottom:0;
+     if(d<min){min=d;match=i;if(!d)break;}
+   }
+   readingPage=match;progress.textContent=(match+1)+' / '+count;
+   trim();
+   if(!observer){
+     for(let i=Math.max(0,match-1);i<=Math.min(count-1,match+2);i++)request(i);
+   }
+ }
+ function sharpen(){
+   if(disposed)return;
+   const i=readingPage;
+   for(let n=Math.max(0,i-1);n<=Math.min(count-1,i+1);n++)request(n);
+ }
+ function queueSharpen(){
+   if(qualityTimer)clearTimeout(qualityTimer);
+   qualityTimer=setTimeout(()=>{qualityTimer=0;sharpen();},165);
+ }
+ function changeZoom(requested,fx=body.clientWidth/2,fy=body.clientHeight/2,interactive=false){
+   if(disposed)return;
+   const next=Math.min(4,Math.max(.65,Math.round(Number(requested)*1000)/1000));
+   if(!Number.isFinite(next)||Math.abs(next-scale)<.003)return;
+   const previous=scale;
+   // Preserve the document point under the user's fingers or the control focus.
+   const anchorX=(body.scrollLeft+fx)/previous;
+   const anchorY=(body.scrollTop+fy)/previous;
+   scale=next;
+   stack.style.width=(scale*100)+'%';
+   percent.textContent=Math.round(scale*100)+'%';
+   body.scrollLeft=Math.max(0,anchorX*scale-fx);
+   body.scrollTop=Math.max(0,anchorY*scale-fy);
+   updatePage();
+   if(!interactive)queueSharpen();
+ }
  for(let i=0;i<count;i++){
-   const metricsEntry=metrics[i];
-   const w=Number(metricsEntry?.[0]),h=Number(metricsEntry?.[1]);
-   const aspect=w>0&&h>0?w/h:.707;
+   const data=metrics[i],w=Number(data?.[0]),h=Number(data?.[1]);
+   const aspect=Number.isFinite(w/h)&&w>0&&h>0?w/h:.707106;
    const cell=E('section','fg-pdf-section');
    cell.dataset.page=String(i+1);
    cell.style.aspectRatio=String(aspect);
    cell.setAttribute('aria-label','PDF page '+(i+1));
-   cell.appendChild(E('div','fg-pdf-skeleton','Page '+(i+1)));
-   container.appendChild(cell);refs.push(cell);
+   cell.appendChild(skeleton(i));
+   pages.appendChild(cell);cells.push(cell);
  }
- if(!count)container.appendChild(E('p','fg-reader-empty','The PDF contains no pages.'));
+ if(!count)pages.appendChild(E('p','fg-reader-empty','This PDF is empty.'));
  stage(bar,body);
+ // Gesture scale never invokes the native renderer inside touchmove.
+ const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+ const focal=(a,b)=>{
+   const rect=body.getBoundingClientRect();
+   return [(a.clientX+b.clientX)/2-rect.left,(a.clientY+b.clientY)/2-rect.top];
+ };
+ const onTouchStart=e=>{
+   if(e.touches.length===2){
+     const [x,y]=focal(e.touches[0],e.touches[1]);
+     pinch={span:Math.max(1,distance(e.touches[0],e.touches[1])),
+       initial:scale,x,y,moved:false};
+   }
+ };
+ const onTouchMove=e=>{
+   if(!pinch||e.touches.length!==2)return;
+   e.preventDefault();pinch.moved=true;
+   const [x,y]=focal(e.touches[0],e.touches[1]);
+   changeZoom(pinch.initial*distance(e.touches[0],e.touches[1])/pinch.span,
+     x,y,true);
+ };
+ let lastTouchTime=0,lastTouchPoint=null,suppressTap=false;
+ const onTouchEnd=e=>{
+   if(pinch){
+     if(e.touches.length<2){suppressTap=pinch.moved;pinch=null;queueSharpen();}
+     return;
+   }
+   if(e.touches.length||e.changedTouches.length!==1)return;
+   if(suppressTap){suppressTap=false;return;}
+   const t=Date.now(),v=e.changedTouches[0],rect=body.getBoundingClientRect();
+   if(t-lastTouchTime<320&&lastTouchPoint&&
+      Math.hypot(v.clientX-lastTouchPoint[0],v.clientY-lastTouchPoint[1])<32){
+     e.preventDefault();
+     changeZoom(scale>=1.8?1:2,v.clientX-rect.left,v.clientY-rect.top);
+     lastTouchTime=0;lastTouchPoint=null;
+   }else{lastTouchTime=t;lastTouchPoint=[v.clientX,v.clientY];}
+ };
+ body.addEventListener('touchstart',onTouchStart,{passive:true});
+ body.addEventListener('touchmove',onTouchMove,{passive:false});
+ body.addEventListener('touchend',onTouchEnd,{passive:false});
+ body.addEventListener('touchcancel',()=>{pinch=null;queueSharpen();},{passive:true});
+ // Desktop/test accessibility: Ctrl+wheel zoom, double click, keyboard.
+ body.addEventListener('wheel',e=>{
+   if(!e.ctrlKey&&!e.metaKey)return;
+   e.preventDefault();
+   const rect=body.getBoundingClientRect();
+   changeZoom(scale*Math.exp(-e.deltaY*.008),e.clientX-rect.left,e.clientY-rect.top);
+ },{passive:false});
+ body.addEventListener('dblclick',e=>{
+   const rect=body.getBoundingClientRect();
+   changeZoom(scale>=1.8?1:2,e.clientX-rect.left,e.clientY-rect.top);
+ });
+ body.addEventListener('keydown',e=>{
+   if(e.key==='+'||e.key==='='){e.preventDefault();changeZoom(scale*1.25);}
+   if(e.key==='-'){e.preventDefault();changeZoom(scale/1.25);}
+   if(e.key==='0'){e.preventDefault();changeZoom(1);}
+ });
  if(window.IntersectionObserver){
    observer=new IntersectionObserver(items=>{
      if(disposed)return;
-     for(const item of items)if(item.isIntersecting){
-       const i=Number(item.target.dataset.page)-1;put(i);
-     }
-   },{root:body,rootMargin:'90% 0px',threshold:0});
-   for(const cell of refs)observer.observe(cell);
+     for(const item of items)if(item.isIntersecting)
+       request(Number(item.target.dataset.page)-1);
+   },{root:body,rootMargin:'80% 0px',threshold:0});
+   cells.forEach(cell=>observer.observe(cell));
  }
- let raf=0;
- const onScroll=()=>{
-   if(raf)return;
-   raf=requestAnimationFrame(()=>{raf=0;updateCurrent();});
- };
- body.addEventListener('scroll',onScroll,{passive:true});
- if(count){put(0);if(count>1)put(1);}
+ body.addEventListener('scroll',()=>{
+   if(scrollFrame)return;
+   scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;updatePage();});
+ },{passive:true});
+ if(count){request(0);if(count>1)request(1);}
  activeReaderCleanup=()=>{
-   disposed=true;observer?.disconnect();waiting.clear();
-   if(raf)cancelAnimationFrame(raf);
-   for(const item of loaded.values())item.img.removeAttribute('src');
+   disposed=true;
+   observer?.disconnect();queued.clear();
+   if(qualityTimer)clearTimeout(qualityTimer);
+   if(scrollFrame)cancelAnimationFrame(scrollFrame);
+   for(const [i] of loaded)release(i);
    loaded.clear();
  };
 }
