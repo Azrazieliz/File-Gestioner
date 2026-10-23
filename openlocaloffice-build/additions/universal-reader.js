@@ -493,7 +493,9 @@ function archive(){
  }
  const body=E('div','fg-reader-scroll fg-archive-scroll');
  body.setAttribute('role','document');
- tools.appendChild(E('span','fg-reader-counter',entries.length+' entries'));
+ const position=E('span','fg-reader-counter',isComic?
+   '1 / '+entries.length:entries.length+' files');
+ tools.appendChild(position);
  if(!entries.length){
    body.appendChild(E('p','fg-reader-empty','Archive has no previewable entries.'));
    stage(bar,body);return;
@@ -578,6 +580,15 @@ function archive(){
      if(raf)return;
      raf=requestAnimationFrame(()=>{
        raf=0;trim();
+       const center=body.getBoundingClientRect().top+body.clientHeight*.35;
+       let best=0,minimum=Infinity;
+       for(let i=0;i<cells.length;i++){
+         const rect=cells[i].getBoundingClientRect();
+         const distance=center<rect.top?rect.top-center:center>rect.bottom?
+           center-rect.bottom:0;
+         if(distance<minimum){minimum=distance;best=i;if(!distance)break;}
+       }
+       position.textContent=(best+1)+' / '+entries.length;
        if(!observer){
          const top=body.getBoundingClientRect().top;
          cells.forEach((c,i)=>{
