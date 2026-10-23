@@ -87,6 +87,10 @@ public final class BookArchive implements Closeable {
                     if(isImage(name))archiveImages.add(name);
                 }
             }
+            // Preserve chapter numbers: Lexicographic order puts 10 before 2.
+            // Folders are included in the comparison to keep volumes separate.
+            archiveAll.sort(BookArchive::naturalCompare);
+            archiveImages.sort(BookArchive::naturalCompare);
             if(epub)readPackage();
         }catch(Exception failure){
             if(opened!=null)try{opened.close();}catch(IOException ignored){}
@@ -95,6 +99,37 @@ public final class BookArchive implements Closeable {
             throw failure;
         }
     }
+    /** Locale-independent numeric filename sort: p2.webp before p10.webp.
+     * Files remain grouped under their source directory/volume paths. */
+    public static int naturalCompare(String a,String b) {
+        int i=0,j=0;
+        while(i<a.length()&&j<b.length()) {
+            char ca=a.charAt(i),cb=b.charAt(j);
+            if(ca>='0'&&ca<='9'&&cb>='0'&&cb<='9') {
+                int x=i,y=j;
+                while(x<a.length()&&a.charAt(x)=='0')x++;
+                while(y<b.length()&&b.charAt(y)=='0')y++;
+                int xe=x,ye=y;
+                while(xe<a.length()&&Character.isDigit(a.charAt(xe)))xe++;
+                while(ye<b.length()&&Character.isDigit(b.charAt(ye)))ye++;
+                int lenA=xe-x,lenB=ye-y;
+                if(lenA!=lenB)return Integer.compare(lenA,lenB);
+                for(int k=0;k<lenA;k++)
+                    if(a.charAt(x+k)!=b.charAt(y+k))
+                        return Character.compare(a.charAt(x+k),b.charAt(y+k));
+                int az=i,bz=j;
+                while(az<a.length()&&Character.isDigit(a.charAt(az)))az++;
+                while(bz<b.length()&&Character.isDigit(b.charAt(bz)))bz++;
+                if(az-i!=bz-j)return Integer.compare(az-i,bz-j);
+                i=az;j=bz;continue;
+            }
+            ca=Character.toLowerCase(ca);cb=Character.toLowerCase(cb);
+            if(ca!=cb)return Character.compare(ca,cb);
+            i++;j++;
+        }
+        return Integer.compare(a.length()-i,b.length()-j);
+    }
+
     public String token(){return token;}
     public String title(){return bookTitle;}
     public String author(){return author;}
