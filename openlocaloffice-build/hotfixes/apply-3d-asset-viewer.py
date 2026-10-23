@@ -149,7 +149,7 @@ css.write_text(css.read_text()+r"""
 css.write_text(css.read_text()+r"""
 /* NoWorld source provenance read-only panel */
 .fg-3d-noworld{display:flex;flex-direction:column;gap:6px;background:#17253b;
- color:#e9f2ff;border-top:1px solid #45607d;padding:11px 14px;font:12px/1.5 system-ui}
+ color:#e9f2ff;border-top:1px solid #45607d;padding:11px 14px;font:12px/1.5 system-ui;\n max-height:32vh;overflow:auto;flex:0 0 auto}
 .fg-3d-noworld-title{font-weight:750;color:#c4d7fd;font-size:13px}
 .fg-3d-noworld-grid{display:grid;grid-template-columns:minmax(84px,115px) 1fr;
  gap:4px 10px;word-break:break-word}
