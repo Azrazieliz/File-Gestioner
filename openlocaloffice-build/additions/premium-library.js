@@ -211,7 +211,9 @@ window.FileGestionerNavigation={
      bridge()?.exitFromLibraryRoot?.();
      return true;
    }
-   show();return true;
+   show();
+   bridge()?.readerDiagnostic?.('BACK_TO_LIBRARY');
+   return true;
  }
 };
 window.FileGestionerLibrary={
