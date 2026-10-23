@@ -70,6 +70,15 @@ jobs:
           python3 ../hotfixes/apply-pro-app-branding.py
           python3 ../hotfixes/apply-spreadsheet-interactions.py
           python3 ../hotfixes/apply-landscape-real-icon.py
+          cp ../additions/UniversalReader.java app/src/main/java/com/openlocal/office/core/UniversalReader.java
+          cp ../additions/universal-reader.js app/src/main/assets/universal-reader.js
+          python3 ../hotfixes/apply-universal-reader-backend.py
+          python3 ../hotfixes/apply-universal-reader-ui.py
+          node --check app/src/main/assets/universal-reader.js
+          grep -Fq 'getPdfPage' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'UniversalReader.extractDocument' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'universal-reader.js' app/src/main/assets/index.html
+          grep -Fq 'File Gestioner immersive reader + unified document UI' app/src/main/assets/style.css
           node --check app/src/main/assets/app.js
           grep -q 'getSheetWindow' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -q 'search(String needle' app/src/main/java/com/openlocal/office/core/XlsxSession.java
