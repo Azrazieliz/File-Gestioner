@@ -81,6 +81,7 @@ jobs:
           python3 ../hotfixes/apply-docx-flow-editor.py
           python3 ../hotfixes/apply-3d-asset-viewer.py
           python3 ../hotfixes/apply-continuous-reader-css.py
+          python3 ../hotfixes/apply-professional-pdf-ui.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -105,6 +106,9 @@ jobs:
           bash ../hotfixes/test-rich-docx-reader.sh
           node --check app/src/main/assets/universal-reader.js
           node ../hotfixes/test-continuous-reader.cjs
+          grep -Fq 'fg-pdf-reading' app/src/main/assets/universal-reader.js
+          grep -Fq 'File Gestioner 0.10.3' app/src/main/assets/style.css
+          grep -Fq 'Math.min(2400,targetWidth)' app/src/main/java/com/openlocal/office/core/UniversalReader.java
           grep -Fq 'getPdfPageMetrics' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'File Gestioner 0.10.2' app/src/main/assets/style.css
           grep -Fq 'getPdfPage' app/src/main/java/com/openlocal/office/MainActivity.java

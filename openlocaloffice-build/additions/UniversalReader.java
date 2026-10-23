@@ -65,7 +65,7 @@ public final class UniversalReader {
             try(PdfRenderer pdf=new PdfRenderer(fd)) {
                 if(pageIndex<0||pageIndex>=pdf.getPageCount()) throw new IOException("PDF page out of bounds");
                 try(PdfRenderer.Page page=pdf.openPage(pageIndex)) {
-                    int width=Math.max(360,Math.min(1500,targetWidth));
+                    int width=Math.max(360,Math.min(2400,targetWidth));
                     int height=Math.max(1,Math.round(width*(page.getHeight()/(float)page.getWidth())));
                     if(height>4000){width=Math.round(width*(4000f/height));height=4000;}
                     Bitmap bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);
@@ -73,7 +73,7 @@ public final class UniversalReader {
                         bitmap.eraseColor(Color.WHITE);
                         page.render(bitmap,null,null,PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY);
                         ByteArrayOutputStream out=new ByteArrayOutputStream();
-                        bitmap.compress(Bitmap.CompressFormat.JPEG,84,out);
+                        bitmap.compress(Bitmap.CompressFormat.JPEG,88,out);
                         return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
                     } finally {bitmap.recycle();}
                 }
