@@ -52,7 +52,7 @@ public final class ReaderCovers {
             // why all covers failed (e.g. an unsupported EPUB XML parser).
             android.util.Log.w("FG_COVERS","Thumbnail extraction failed: "+name,e);
             throw e;
-        }        }catch(InterruptedException error){
+        }catch(InterruptedException error){
             Thread.currentThread().interrupt();
             throw new IOException("Cover loading interrupted",error);
         }finally {
