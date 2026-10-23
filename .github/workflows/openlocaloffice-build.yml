@@ -85,6 +85,7 @@ jobs:
           cp ../additions/unified-viewer-controls.js app/src/main/assets/unified-viewer-controls.js
           python3 ../hotfixes/apply-unified-reader-experience.py
           cp ../additions/BookArchive.java app/src/main/java/com/openlocal/office/core/BookArchive.java
+          cp ../additions/SeekableZip.java app/src/main/java/com/openlocal/office/core/SeekableZip.java
           cp ../additions/StreamedText.java app/src/main/java/com/openlocal/office/core/StreamedText.java
           python3 ../hotfixes/apply-epub-native-reader.py
           python3 ../hotfixes/apply-streamed-large-readers.py
