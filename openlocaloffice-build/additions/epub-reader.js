@@ -133,6 +133,7 @@ function epub(doc){
   const bookContent=el('div','fg-book-content');
   const nodes=[],loaded=new Set(),queue=new Set(),heights=new Map();
   let disposed=false,obs=null,workQueued=false,scrollFrame=0,current=0,showUi=true;
+  let restoreMark=null;
   const bottom=el('div','fg-book-bottom');
   const position=el('span','fg-book-progress','Chapter 1 / '+list.length);
   const bookmark=button('◇',saveBookmark,'Bookmark reading position');
@@ -251,6 +252,11 @@ function epub(doc){
       container.replaceChildren(chapter);
       loaded.add(i);
       if(container.offsetHeight>0)heights.set(i,container.offsetHeight);
+      if(restoreMark&&restoreMark.chapter===i){
+        const percent=Math.max(0,Math.min(1,Number(restoreMark.percent)||0));
+        scroll.scrollTop=container.offsetTop+container.offsetHeight*percent;
+        restoreMark=null;
+      }
     }catch(error){
       container.replaceChildren(el('p','fg-book-error','This chapter could not be displayed.'));
     }
@@ -314,7 +320,7 @@ function epub(doc){
     try{
       const stored=JSON.parse(localStorage.getItem(key+'.position')||'null');
       if(stored&&Number.isInteger(stored.chapter)&&stored.chapter>=0&&stored.chapter<nodes.length){
-        current=stored.chapter;enqueue(current);
+        current=stored.chapter;restoreMark=stored;enqueue(current);
         nodes[current].scrollIntoView({behavior:'auto',block:'start'});
       }
     }catch(_){}
