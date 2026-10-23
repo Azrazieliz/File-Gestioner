@@ -14,7 +14,7 @@ need(book.includes('getElementsByTagNameNS("*","itemref")'),'Must use EPUB spine
 need(book.includes('META-INF/container.xml'),'Must locate EPUB package through container.xml');
 need(book.includes('get("idref")')===false&&book.includes('field(item,"idref")'),
      'Spine items need idref lookup');
-need(book.includes('new ZipFile("/proc/self/fd/"'),'Must try seekable provider without a file-size copy');
+need(book.includes('new SeekableZip(handle)'),'Must index seekable SAF ZIP without reopening or copying file');
 need(book.includes('BufferedOutputStream(new FileOutputStream(temp)'),'Nonseekable provider must use disk spool');
 need(book.includes('MAX_CHAPTER_BYTES'),'Large book chunks must remain bounded');
 need(book.includes('WebResourceResponse response('),'Illustrations must stream individually through WebView');
