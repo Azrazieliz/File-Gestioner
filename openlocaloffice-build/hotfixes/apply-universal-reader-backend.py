@@ -136,7 +136,11 @@ replace_once('        return "";\n    }\n    private long displaySize',
     private long displaySize''')
 
 replace_once('        @JavascriptInterface public void saveCopy(){',
-'''        @JavascriptInterface public String getPdfPage(int index,int width) {
+'''        @JavascriptInterface public String getDocxRichWindow(int start,int count) {
+            try {return docx==null?"[]":RichDocxPreview.window(docx.serialize(),start,count);}
+            catch(Exception e){return "[]";}
+        }
+        @JavascriptInterface public String getPdfPage(int index,int width) {
             try { return currentUri==null||!"pdf".equals(currentType)?"":UniversalReader.pdfPage(
                 MainActivity.this,currentUri,index,width); }
             catch(Exception e){return "";}
