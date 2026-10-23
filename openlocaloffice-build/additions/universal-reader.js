@@ -43,15 +43,144 @@ function localBytes(){
  for(const c of chunks){out.set(c,pos);pos+=c.length;}
  return out;
 }
+/* Continuous PDFs: one vertical document, native aspect-ratio placeholders,
+   render only pages approaching the viewport and free distant bitmaps. */
+let activeReaderCleanup=null;
 function pdf(){
- const [bar,tools]=toolbar('Native PDF page · offline');
- controls(tools,doc.pages,pdf);zoomer(tools,pdf);
- const body=E('div','fg-reader-scroll'),p=paper('fg-pdf-sheet'),image=E('img','fg-pdf-img');
- image.alt='PDF page '+(page+1);
- const data=bridge()?.getPdfPage?.(page,Math.round(960*zoom));
- if(data){image.src='data:image/jpeg;base64,'+data;p.appendChild(image);}
- else p.appendChild(E('p','fg-reader-empty','Cannot display page. The PDF may be password-protected or unsupported.'));
- body.appendChild(p);stage(bar,body);
+ const b=bridge();
+ const count=Math.max(0,Number(doc.pages)||0);
+ const [bar,tools]=toolbar('Continuous PDF · swipe vertically');
+ const body=E('div','fg-reader-scroll fg-pdf-scroll');
+ body.setAttribute('role','document');
+ body.setAttribute('aria-label',(doc.name||'PDF')+' · '+count+' pages');
+ const stack=E('div','fg-pdf-stack');
+ const refs=[],loaded=new Map(),waiting=new Set();
+ let metrics=[],observer=null,disposed=false,scheduled=false,readingPage=0,zoomValue=1;
+ try{metrics=JSON.parse(b?.getPdfPageMetrics?.()||'[]');}catch(_){}
+ if(!Array.isArray(metrics))metrics=[];
+ const progress=E('span','fg-reader-counter fg-pdf-progress',
+   count?'Page 1 of '+count:'Empty PDF');
+ progress.setAttribute('aria-live','off');
+ const zoomLabel=E('span','fg-reader-counter','Fit width');
+ const container=E('div','fg-pdf-container');
+ stack.appendChild(container);
+ body.appendChild(stack);
+ function widthPx(){return Math.max(360,Math.min(1500,
+     Math.round(Math.max(360,body.clientWidth-20)*(window.devicePixelRatio||1)*zoomValue)));}
+ function put(index){
+   if(disposed||loaded.has(index)||waiting.has(index)||index<0||index>=count)return;
+   waiting.add(index);
+   if(!scheduled){scheduled=true;requestAnimationFrame(drawNext);}
+ }
+ function drawNext(){
+   scheduled=false;
+   if(disposed)return;
+   const iterator=waiting.values(),next=iterator.next();
+   if(next.done)return;
+   const index=next.value;waiting.delete(index);
+   const cell=refs[index];
+   if(!cell)return;
+   // Never do expensive bridge PDF rendering for pages now far from view.
+   const viewport=body.getBoundingClientRect(),bounds=cell.getBoundingClientRect();
+   if(bounds.bottom<viewport.top-2*body.clientHeight ||
+      bounds.top>viewport.bottom+2*body.clientHeight){
+     if(waiting.size){scheduled=true;requestAnimationFrame(drawNext);}return;
+   }
+   try{
+     const data=b?.getPdfPage?.(index,widthPx());
+     if(!data)throw Error('The page could not be rendered.');
+     const img=E('img','fg-pdf-img');
+     img.alt='Page '+(index+1)+' of '+count;
+     img.decoding='async';
+     img.src='data:image/jpeg;base64,'+data;
+     img.onerror=()=>{if(!disposed)cell.replaceChildren(
+       E('div','fg-reader-empty','Page '+(index+1)+' could not be displayed.'));};
+     cell.replaceChildren(img);
+     loaded.set(index,{img,pixels:widthPx()});
+   }catch(error){
+     cell.replaceChildren(E('div','fg-reader-empty',
+       'Cannot display page '+(index+1)+': '+String(error.message||error)));
+   }
+   trim();
+   if(waiting.size){scheduled=true;requestAnimationFrame(drawNext);}
+ }
+ function trim(){
+   const viewport=body.getBoundingClientRect();
+   for(const [i,item] of loaded){
+     const box=refs[i].getBoundingClientRect();
+     if(box.bottom<viewport.top-2.5*body.clientHeight ||
+        box.top>viewport.bottom+2.5*body.clientHeight){
+       item.img.removeAttribute('src');
+       loaded.delete(i);
+       refs[i].replaceChildren(E('div','fg-pdf-skeleton','Page '+(i+1)));
+     }
+   }
+ }
+ function updateCurrent(){
+   if(disposed)return;
+   const center=body.getBoundingClientRect().top+Math.max(20,body.clientHeight*.3);
+   let best=readingPage,dist=Infinity;
+   for(let i=0;i<count;i++){
+     const rect=refs[i].getBoundingClientRect();
+     const d=rect.top>center?rect.top-center:rect.bottom<center?center-rect.bottom:0;
+     if(d<dist){dist=d;best=i;if(d===0)break;}
+   }
+   readingPage=best;progress.textContent='Page '+(best+1)+' of '+count;
+   trim();
+   // Fallback if WebView lacks IntersectionObserver.
+   if(!observer)for(let i=Math.max(0,best-1);i<=Math.min(count-1,best+2);i++)put(i);
+ }
+ function resizeZoom(delta,fit=false){
+   zoomValue=fit?1:Math.max(.7,Math.min(2.5,Math.round((zoomValue+delta)*100)/100));
+   stack.style.width=Math.round(zoomValue*100)+'%';
+   zoomLabel.textContent=zoomValue===1?'Fit width':Math.round(zoomValue*100)+'%';
+   for(const [i,item] of loaded){
+     item.img.removeAttribute('src');
+     loaded.delete(i);
+     refs[i].replaceChildren(E('div','fg-pdf-skeleton','Page '+(i+1)));
+   }
+   updateCurrent();
+   for(let i=Math.max(0,readingPage-1);i<=Math.min(count-1,readingPage+1);i++)put(i);
+ }
+ tools.append(progress,
+   button('−',()=>resizeZoom(-.15)),
+   zoomLabel,button('+',()=>resizeZoom(.15)),
+   button('Fit width',()=>resizeZoom(0,true)));
+ for(let i=0;i<count;i++){
+   const metricsEntry=metrics[i];
+   const w=Number(metricsEntry?.[0]),h=Number(metricsEntry?.[1]);
+   const aspect=w>0&&h>0?w/h:.707;
+   const cell=E('section','fg-pdf-section');
+   cell.dataset.page=String(i+1);
+   cell.style.aspectRatio=String(aspect);
+   cell.setAttribute('aria-label','PDF page '+(i+1));
+   cell.appendChild(E('div','fg-pdf-skeleton','Page '+(i+1)));
+   container.appendChild(cell);refs.push(cell);
+ }
+ if(!count)container.appendChild(E('p','fg-reader-empty','The PDF contains no pages.'));
+ stage(bar,body);
+ if(window.IntersectionObserver){
+   observer=new IntersectionObserver(items=>{
+     if(disposed)return;
+     for(const item of items)if(item.isIntersecting){
+       const i=Number(item.target.dataset.page)-1;put(i);
+     }
+   },{root:body,rootMargin:'90% 0px',threshold:0});
+   for(const cell of refs)observer.observe(cell);
+ }
+ let raf=0;
+ const onScroll=()=>{
+   if(raf)return;
+   raf=requestAnimationFrame(()=>{raf=0;updateCurrent();});
+ };
+ body.addEventListener('scroll',onScroll,{passive:true});
+ if(count){put(0);if(count>1)put(1);}
+ activeReaderCleanup=()=>{
+   disposed=true;observer?.disconnect();waiting.clear();
+   if(raf)cancelAnimationFrame(raf);
+   for(const item of loaded.values())item.img.removeAttribute('src');
+   loaded.clear();
+ };
 }
 function imageView(){
  const [bar,tools]=toolbar('Image preview · pinch/scroll to inspect');
@@ -300,6 +429,7 @@ function backButton(){
 }
 window.loadDocument=function(d){
  if(assetUrl){URL.revokeObjectURL(assetUrl);assetUrl=null;}
+ if(activeReaderCleanup){activeReaderCleanup();activeReaderCleanup=null;}
  doc=d;page=0;zoom=1;archiveIndex=0;editing=false;
  $('editor')?.classList.remove('fg-reader-host');backButton().classList.add('hidden');
  original(d);
