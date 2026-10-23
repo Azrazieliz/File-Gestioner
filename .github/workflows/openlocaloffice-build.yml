@@ -174,3 +174,39 @@ jobs:
           path: openlocaloffice-build/project/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Enable emulator acceleration
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0660", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Android 16 startup and library UI screenshot
+        if: github.event_name == 'pull_request'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r openlocaloffice-build/project/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
+            adb shell am start -W -n com.openlocal.office/.MainActivity
+            sleep 3
+            adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "File Gestioner failed to launch"; exit 1; }
+            mkdir -p screenshots
+            adb shell screencap -p /sdcard/fg-reader-home.png
+            adb pull /sdcard/fg-reader-home.png screenshots/fg-reader-home.png
+            adb logcat -b crash -d | tee screenshots/crash-log.txt
+            if grep -q 'FATAL EXCEPTION' screenshots/crash-log.txt; then exit 1; fi
+
+      - name: Upload runtime smoke screenshot
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: File-Gestioner-runtime-screenshot
+          path: screenshots/
+          retention-days: 3
