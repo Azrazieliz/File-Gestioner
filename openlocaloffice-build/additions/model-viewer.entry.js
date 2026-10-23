@@ -266,6 +266,17 @@ function open(doc,host,bridge){
       const nw=findNoWorldReceipt(model);
       if(nw)rootUI.appendChild(noWorldPanel(nw));
       actions.append(q('Fit',fit));
+      function dolly(factor){
+        const offset=camera.position.clone().sub(controls.target);
+        const current=offset.length();
+        const destination=Math.max(controls.minDistance,
+          Math.min(controls.maxDistance,current*factor));
+        offset.setLength(destination);
+        camera.position.copy(controls.target).add(offset);
+        controls.update();
+      }
+      actions.append(q('−',()=>dolly(1.25)));
+      actions.append(q('+',()=>dolly(.8)));
       let wire=false;
       actions.append(q('Wireframe',()=>{
         wire=!wire;model.traverse(o=>{if(!o.material)return;
