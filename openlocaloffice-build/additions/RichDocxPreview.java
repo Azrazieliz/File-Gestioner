@@ -73,6 +73,23 @@ public final class RichDocxPreview {
         return new RichDocxPreview(bytes).blocks.size();
     }
 
+    /** Search the complete logical document, not merely a loaded screenful. */
+    public static int find(byte[] bytes,String query,int from)throws Exception {
+        if(query==null||query.isBlank())return -1;
+        String needle=query.trim().toLowerCase(Locale.ROOT);
+        if(needle.length()>128)return -1;
+        RichDocxPreview doc=new RichDocxPreview(bytes);
+        int size=doc.blocks.size();
+        for(int offset=0;offset<size;offset++){
+            int index=(Math.max(0,from)+offset)%size;
+            NodeList runs=doc.blocks.get(index).getElementsByTagNameNS(W,"t");
+            StringBuilder value=new StringBuilder();
+            for(int i=0;i<runs.getLength();i++)value.append(runs.item(i).getTextContent());
+            if(value.toString().toLowerCase(Locale.ROOT).contains(needle))return index;
+        }
+        return -1;
+    }
+
     /** Stable bounded ordered blocks. Each item is [blockIndex,safeMarkup]. */
     public static String window(byte[] bytes,int start,int count)throws Exception{
         RichDocxPreview doc=new RichDocxPreview(bytes);
