@@ -85,13 +85,10 @@ public final class ReaderCovers {
         if(isArchive(name)){
             try(BookArchive book=new BookArchive(ctx,uri,lower.endsWith(".epub"))){
                 if(book.imageCount()==0)return null;
-                String candidate=book.imageName(0);
-                for(int i=0;i<Math.min(book.imageCount(),25);i++){
-                    String n=book.imageName(i).toLowerCase(Locale.ROOT);
-                    if(n.contains("cover")||n.contains("front")||n.contains("title")){
-                        candidate=book.imageName(i);break;
-                    }
-                }
+                // EPUB: honor package cover metadata. ZIP/CBZ: use the first
+                // actual numbered image, not an arbitrary filename farther in.
+                String candidate=book.preferredCover();
+                if(candidate==null)return null;
                 try(InputStream bounds=book.coverStream(candidate)){
                     BitmapFactory.Options meta=new BitmapFactory.Options();
                     meta.inJustDecodeBounds=true;BitmapFactory.decodeStream(bounds,null,meta);
