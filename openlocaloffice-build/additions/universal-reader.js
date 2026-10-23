@@ -185,6 +185,7 @@ function pdf(){
  }
  if(!count)pages.appendChild(E('p','fg-reader-empty','This PDF is empty.'));
  stage(bar,body);
+ document.body.classList.add('fg-pdf-reading');
  // Gesture scale never invokes the native renderer inside touchmove.
  const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
  const focal=(a,b)=>{
@@ -627,6 +628,7 @@ function backButton(){
 window.loadDocument=function(d){
  if(assetUrl){URL.revokeObjectURL(assetUrl);assetUrl=null;}
  if(activeReaderCleanup){activeReaderCleanup();activeReaderCleanup=null;}
+ document.body.classList.remove('fg-pdf-reading');
  doc=d;page=0;zoom=1;archiveIndex=0;editing=false;
  $('editor')?.classList.remove('fg-reader-host');backButton().classList.add('hidden');
  original(d);
