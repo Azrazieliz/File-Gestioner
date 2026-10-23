@@ -476,13 +476,31 @@ function docx(){
 function archive(){
  let entries=[];
  try{entries=JSON.parse(bridge()?.getArchiveEntries?.()||'[]');}catch(_){}
- if(doc.format==='cbz')entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(e.name));
- const [bar,tools]=toolbar(doc.format==='cbz'?
-    'Continuous comic · scroll down through every image':
-    'Archive contents · scroll and expand entries');
+
+ const imageEntries=entries.filter(e=>/\.(?:png|jpe?g|gif|webp|bmp|avif|svg)$/i.test(e.name||''));
+ const natural=(a,b)=>(a.name||'').localeCompare(b.name||'',undefined,
+    {numeric:true,sensitivity:'base'});
+ imageEntries.sort(natural);
+ const isComic=doc.archiveMode==='files'?false:
+    (doc.archiveMode==='comic'||doc.format==='cbz'||imageEntries.length>0);
+ doc.readerMode=isComic?'comic':'files';
+ if(isComic)entries=imageEntries;
+ else entries.sort(natural);
+ const [bar,tools]=toolbar(isComic?
+    'Read images continuously':'Browse archive');
  const body=E('div','fg-reader-scroll fg-archive-scroll');
  body.setAttribute('role','document');
- tools.appendChild(E('span','fg-reader-counter',entries.length+' entries'));
+
+ tools.appendChild(E('span','fg-reader-counter',
+   entries.length+(isComic?' pages':' files')));
+ if(doc.format==='zip'&&imageEntries.length){
+   const switcher=button(isComic?'Files':'Read',()=>{
+     window.loadDocument({...doc,archiveMode:isComic?'files':'comic'});
+   });
+   switcher.setAttribute('aria-label',isComic?
+     'Browse all archive files':'Read archive images');
+   tools.appendChild(switcher);
+ }
  if(!entries.length){
    body.appendChild(E('p','fg-reader-empty','Archive has no previewable entries.'));
    stage(bar,body);return;
@@ -512,7 +530,7 @@ function archive(){
        'Cannot preview '+entry.name+': '+String(error.message||error)));
    }
  }
- if(doc.format==='cbz'){
+ if(isComic){
    const stack=E('div','fg-pdf-stack fg-comic-stack'),cells=[],loaded=new Map();
    let disposed=false,observer=null,scheduled=false;
    const queue=new Set();
@@ -543,7 +561,7 @@ function archive(){
           rect.top>view.bottom+3*body.clientHeight){
          target.querySelectorAll('img').forEach(img=>img.removeAttribute('src'));
          loaded.delete(i);
-         cells[i].replaceChildren(E('div','fg-pdf-skeleton','Image '+(i+1)));
+         cells[i].replaceChildren(E('div','fg-pdf-skeleton',''));
        }
      }
    }
@@ -551,7 +569,7 @@ function archive(){
      const frame=E('section','fg-comic-section');
      frame.dataset.page=String(i+1);
      frame.setAttribute('aria-label','Comic image '+(i+1)+' '+entry.name);
-     frame.appendChild(E('div','fg-pdf-skeleton','Image '+(i+1)));
+     frame.appendChild(E('div','fg-pdf-skeleton',''));
      root.appendChild(frame);cells.push(frame);
    });
    stack.appendChild(root);body.appendChild(stack);stage(bar,body);
@@ -588,9 +606,13 @@ function archive(){
    const list=E('div','fg-archive-list');
    entries.forEach((entry,i)=>{
      const row=E('details','fg-archive-entry');
-     const summary=E('summary','fg-archive-summary',
-       (entry.name||'Entry '+(i+1))+
-       (entry.size>=0?' · '+(Math.round(entry.size/1024))+' KiB':''));
+     const summary=E('summary','fg-archive-summary');
+     const filepath=String(entry.name||'');
+     const basename=filepath.split('/').pop()||'File '+(i+1);
+     summary.append(E('span','fg-archive-filename',basename),
+       E('span','fg-archive-meta',
+         (filepath.includes('/')?filepath.substring(0,filepath.lastIndexOf('/'))+' · ':'')+
+         (entry.size>=0?Math.round(entry.size/1024)+' KiB':'')));
      const dest=E('div','fg-archive-preview');
      row.append(summary,dest);
      row.addEventListener('toggle',()=>{
