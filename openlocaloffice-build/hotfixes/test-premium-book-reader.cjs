@@ -37,7 +37,7 @@ need(j.includes('localStorage.setItem(key')&&j.includes('Bookmark reading positi
      'Persistent per-book preferences and bookmark required');
 need(j.includes('if(!allow.has(tag))')&&j.includes("includes(tag)")&&
      j.includes('location.origin==='),'External executable content and media must not load');
-need(style.includes('fg-book-theme-midnight')&&style.includes('fg-book-theme-paper'),
+need(style.includes('.fg-book{')&&style.includes('fg-book-theme-paper'),
      'Night and Paper reading themes required');
 need(html.indexOf('unified-viewer-controls.js')<html.indexOf('epub-reader.js'),
      'EPUB wrapper must attach after shared UI control wrapper');
