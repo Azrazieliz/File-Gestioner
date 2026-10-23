@@ -19,11 +19,6 @@ function stage(t,content,hasTextSearch=false){
  document.querySelector('.searchbar')?.classList.toggle('hidden',!hasTextSearch);
  if(ro(doc)){$('saveBtn').disabled=true;$('copyBtn').disabled=true;}
 }
-function controls(bar,count,render){
- const prev=button('‹',()=>{page=Math.max(0,page-1);render();});prev.disabled=page<=0;
- const next=button('›',()=>{page=Math.min(count-1,page+1);render();});next.disabled=page>=count-1;
- bar.append(prev,E('span','fg-reader-counter',(page+1)+' / '+count),next);
-}
 function zoomer(bar,render){
  bar.append(button('−',()=>{zoom=Math.max(.7,zoom-.15);render();}),
   E('span','fg-reader-counter',Math.round(zoom*100)+'%'),
@@ -194,34 +189,6 @@ function imageView(){
   body.appendChild(img);
  }catch(e){body.appendChild(E('p','fg-reader-empty',String(e.message||e)));}
  stage(bar,body);
-}
-/* Accessible, paragraph-boundary text pagination: never slice mid-word. */
-let textCache=null;
-function readablePages(raw,format){
- const input=String(raw||'').replace(/\r\n?/g,'\n');
- if(textCache&&textCache.input===input&&textCache.format===format)return textCache.pages;
- const limit=22000,pages=[],parts=input.split(/(\n{2,})/);
- let current='';
- function flush(){if(current){pages.push(current);current='';}}
- for(const part of parts){
-   if(!part)continue;
-   if(part.length>limit){
-     flush();
-     let rem=part;
-     while(rem.length>limit){
-       let cut=rem.lastIndexOf(' ',limit);
-       if(cut<limit*.55)cut=rem.lastIndexOf('\n',limit);
-       if(cut<limit*.55)cut=limit;
-       pages.push(rem.slice(0,cut));rem=rem.slice(cut).replace(/^\s+/,'');
-     }
-     current=rem;continue;
-   }
-   if(current.length+part.length>limit)flush();
-   current+=part;
- }
- flush();
- if(!pages.length)pages.push('');
- textCache={input,format,pages};return pages;
 }
 function addLines(host,raw,format){
  const code=/^(json|xml|yaml|yml|toml|log|sql|tsv|java|kt|kts|js|ts|css|scss|py|sh|ini|conf|svg|gradle|c|cpp|h|hpp|go|rs|php|gitignore)$/.test(format||'');
@@ -403,16 +370,25 @@ function docx(){
    scheduled=true;
    requestAnimationFrame(()=>{
      scheduled=false;
-     if(body.scrollTop+body.clientHeight>=body.scrollHeight-850)appendNext();
+     if(body.scrollTop+body.clientHeight>=body.scrollHeight-850){
+       appendNext();
+       requestAnimationFrame(fillViewport);
+     }
    });
  },{passive:true});
  stage(bar,body);
  // DOCX editing exists, but accidental Save in reader mode is not offered.
  if($('saveBtn'))$('saveBtn').disabled=true;
  if($('copyBtn'))$('copyBtn').disabled=true;
- requestAnimationFrame(()=>{
-   if(body.scrollHeight<=body.clientHeight+350)appendNext();
- });
+ function fillViewport(){
+   if(next>=count||loading)return;
+   if(body.scrollHeight<=body.clientHeight+400){
+     const before=next;
+     appendNext();
+     if(next>before)requestAnimationFrame(fillViewport);
+   }
+ }
+ requestAnimationFrame(fillViewport);
 }
 /* Comics and archives are content streams, not one-entry slide decks. */
 function archive(){
