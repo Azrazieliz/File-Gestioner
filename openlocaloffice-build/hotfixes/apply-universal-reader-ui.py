@@ -178,4 +178,14 @@ html,body{background:var(--fg-app-bg);font-family:system-ui,-apple-system,Roboto
 }
 '''
     CSS.write_text(css)
+CSS.write_text(CSS.read_text()+'''
+.fg-docx-rich-block{line-height:1.7;color:var(--fg-paper-text)}
+.fg-docx-rich-block p{margin:0 0 .75em;min-height:.35em;white-space:pre-wrap}
+.fg-docx-rich-block h1{font-size:1.9em;margin:0 0 1em;line-height:1.26}
+.fg-docx-rich-block h2{font-size:1.45em;margin:1.3em 0 .65em;line-height:1.3}
+.fg-docx-rich-block h3{font-size:1.2em;margin:1.1em 0 .6em}
+.fg-docx-rich-block h4{font-size:1.1em;margin:1em 0 .6em}
+.fg-docx-rich-block img{display:block;max-width:100%;height:auto;margin:1em auto}
+.fg-docx-rich-block .fg-docx-quote{border-left:3px solid var(--fg-reader-accent);padding-left:1em;font-style:italic}
+''')
 print("Universal reader web UI installed")
