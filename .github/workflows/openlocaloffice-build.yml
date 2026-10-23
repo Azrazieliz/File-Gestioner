@@ -78,6 +78,7 @@ jobs:
           cp ../additions/universal-reader.js app/src/main/assets/universal-reader.js
           python3 ../hotfixes/apply-universal-reader-backend.py
           python3 ../hotfixes/apply-universal-reader-ui.py
+          python3 ../hotfixes/apply-docx-flow-editor.py
           bash ../hotfixes/test-rich-docx-reader.sh
           node --check app/src/main/assets/universal-reader.js
           grep -Fq 'getPdfPage' app/src/main/java/com/openlocal/office/MainActivity.java
@@ -85,6 +86,8 @@ jobs:
           grep -Fq 'LegacyOfficeReader.read' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'getDocxRichBlockCount' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'findDocxBlock' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'fg-docx-edit-paragraph' app/src/main/assets/app.js
+          grep -Fq 'fg-docx-edit-sheet' app/src/main/assets/style.css
           grep -Fq 'poi-scratchpad' app/build.gradle.kts
           grep -Fq 'universal-reader.js' app/src/main/assets/index.html
           grep -Fq 'File Gestioner immersive reader + unified document UI' app/src/main/assets/style.css
