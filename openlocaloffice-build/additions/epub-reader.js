@@ -42,8 +42,24 @@ function chapterFragment(html,base){
     if(node.nodeType===3)return document.createTextNode(node.nodeValue||'');
     if(node.nodeType!==1)return document.createDocumentFragment();
     const tag=node.localName?.toLowerCase()||'';
+    if(tag==='svg'){
+      // EPUB 2 image-only pages commonly wrap the cover in SVG <image>.
+      // Extract only the referenced local raster asset; never execute SVG.
+      const embedded=node.querySelector('image');
+      const href=embedded?.getAttribute('href')||
+        embedded?.getAttribute('xlink:href')||
+        embedded?.getAttributeNS('http://www.w3.org/1999/xlink','href');
+      const url=imageRef(href);
+      if(!url)return document.createDocumentFragment();
+      const figure=el('figure','fg-book-illustration');
+      const image=el('img','fg-book-cover-image');
+      image.src=url;image.loading='lazy';image.decoding='async';
+      image.alt=embedded?.getAttribute('aria-label')||'Book illustration';
+      figure.appendChild(image);
+      return figure;
+    }
     if(['script','style','iframe','object','embed','form','input','video','audio',
-        'noscript','svg','math','canvas','link','meta'].includes(tag))
+        'noscript','math','canvas','link','meta'].includes(tag))
       return document.createDocumentFragment();
     if(!allow.has(tag)){
       const frag=document.createDocumentFragment();
