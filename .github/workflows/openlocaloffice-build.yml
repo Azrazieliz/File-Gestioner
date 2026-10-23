@@ -277,6 +277,14 @@ jobs:
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "Book opening crashed Android process"; exit 1; }
             adb exec-out screencap -p > screenshots/fg-86mib-epub.png
             test -s screenshots/fg-86mib-epub.png
+            python3 openlocaloffice-build/hotfixes/create-image-zip-fixture.py /tmp/fg-102-images.zip
+            adb exec-in run-as com.openlocal.office sh -c 'cat > files/fg-102-images.zip' < /tmp/fg-102-images.zip
+            adb shell am start -W -n com.openlocal.office/.MainActivity -a android.intent.action.VIEW -t application/zip -d file:///data/user/0/com.openlocal.office/files/fg-102-images.zip
+            sleep 4
+            adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "ZIP comic reader crashed"; exit 1; }
+            adb exec-out screencap -p > screenshots/fg-102-image-zip.png
+            test -s screenshots/fg-102-image-zip.png
+            rm -f /tmp/fg-102-images.zip
             rm -f /tmp/fg-large-book.epub
             adb logcat -b crash -d | tee screenshots/crash-log.txt
             if grep -q 'FATAL EXCEPTION' screenshots/crash-log.txt; then exit 1; fi
