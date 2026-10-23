@@ -34,6 +34,7 @@ public final class BookArchive implements Closeable {
     private final LinkedHashMap<String,String> titles = new LinkedHashMap<>();
     private String bookTitle = "";
     private String author = "";
+    private String preferredCoverName = null;
     private final ArrayList<String> archiveImages = new ArrayList<>();
     private final ArrayList<String> archiveAll = new ArrayList<>();
     private static final int MAX_CHAPTER_BYTES=6*1024*1024;
@@ -135,6 +136,17 @@ public final class BookArchive implements Closeable {
     public String author(){return author;}
     public int chapterCount(){return chapters.size();}
     public int imageCount(){return archiveImages.size();}
+    /** EPUB manifest cover (when present) or first raster illustration.
+     * ZIP/CBZ: always use the first numerically ordered image. */
+    public String preferredCover() {
+        if(preferredCoverName!=null&&zip.getEntry(preferredCoverName)!=null
+           &&isRaster(preferredCoverName))return preferredCoverName;
+        for(String image:archiveImages)if(isRaster(image))return image;
+        return null;
+    }
+    private static boolean isRaster(String path){
+        return isImage(path)&&!path.toLowerCase(Locale.ROOT).endsWith(".svg");
+    }
     /** A ZIP is a comic when nearly all displayable entries are image pages,
      * independent of the ZIP extension or enclosing directory name.
      * Metadata/hidden files do not influence classification. */
@@ -374,6 +386,19 @@ public final class BookArchive implements Closeable {
                 byId.put(id,name);display.put(id,href);
                 String properties=field(item,"properties");
                 if(Arrays.asList(properties.split("\\s+")).contains("nav"))navPath=name;
+                if(Arrays.asList(properties.split("\\s+")).contains("cover-image")
+                   &&isRaster(name))preferredCoverName=name;
+            }
+        }
+        // EPUB2 identifies its cover by the OPF metadata id.
+        if(preferredCoverName==null){
+            NodeList meta=packageDoc.getElementsByTagNameNS("*","meta");
+            for(int i=0;i<meta.getLength();i++){
+                Element item=element(meta.item(i));
+                if("cover".equalsIgnoreCase(field(item,"name"))){
+                    String image=byId.get(field(item,"content"));
+                    if(image!=null&&isRaster(image)){preferredCoverName=image;break;}
+                }
             }
         }
         // Navigation documents supply real editorial chapter titles. Only use
