@@ -60,7 +60,7 @@ repl(js,
     "window.loadDocument=function(d){\n if(assetUrl)",
     "window.loadDocument=function(d){\n  window.FileGestionerModelViewer?.dispose?.();\n  if(assetUrl)")
 repl(js,
-    "  else if(d.type==='docx')docx();",
+    " else if(d.type==='docx')docx();",
     '''  else if(d.type==='docx')docx();
   else if(d.type==='model3d'){
     const host=$('editor');
