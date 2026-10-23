@@ -208,5 +208,6 @@ window.FileGestionerLibrary={
 document.addEventListener('DOMContentLoaded',()=>{
  // The native app never forces a folder selection; all providers remain opt-in.
  show();
+ bridge()?.readerDiagnostic?.('LIBRARY_READY');
 });
 })();
