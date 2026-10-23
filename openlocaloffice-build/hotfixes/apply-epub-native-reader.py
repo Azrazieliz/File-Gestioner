@@ -63,7 +63,7 @@ source=source.replace(anchor,'''                // EPUB is a genuine spine-based
 '''+anchor,1)
 anchor='''        @JavascriptInterface public int getDocxRichBlockCount() {'''
 assert source.count(anchor)==1
-source=source.replace(anchor,'''        @JavascriptInterface public String getBookContents(){
+source=source.replace(anchor,r'''        @JavascriptInterface public String getBookContents(){
             BookArchive active=bookArchive;
             if(active==null)return "[]";
             try{return active.contents().toString();}
