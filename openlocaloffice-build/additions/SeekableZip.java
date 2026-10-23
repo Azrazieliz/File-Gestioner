@@ -146,7 +146,7 @@ public final class SeekableZip implements Closeable {
         }
         if(records.isEmpty())throw new IOException("Archive has no files");
     }
-    @Override public void close(){/* The caller owns the SAF descriptor. */}
+    @Override public void close() throws IOException{/* The caller owns the SAF descriptor. */}
     private final class RangeStream extends InputStream {
         private long offset,remaining;
         RangeStream(long start,long bytes){offset=start;remaining=bytes;}
