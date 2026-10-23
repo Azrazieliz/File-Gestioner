@@ -94,7 +94,7 @@ function textView(){
 }
 function docxEntries(){
  const count=doc.paragraphCount||0;
- try{return JSON.parse(bridge()?.getParagraphWindow?.(page*150,Math.max(0,Math.min(150,count-page*150)))||'[]');}
+ try{return JSON.parse(bridge()?.getDocxRichWindow?.(page*150,Math.max(0,Math.min(150,count-page*150)))||'[]');}
  catch(_){return [];}
 }
 function docx(){
@@ -106,7 +106,7 @@ function docx(){
    $('fgBackToReader').classList.remove('hidden');
  }));
  const body=E('div','fg-reader-scroll'),p=paper('fg-document-sheet');
- for(const [i,txt] of docxEntries())addLines(p,txt,'docx');
+ for(const [i,html] of docxEntries()){const block=E('div','fg-docx-rich-block');block.innerHTML=html;p.appendChild(block);}
  body.appendChild(p);stage(bar,body,true);
 }
 function archive(){
