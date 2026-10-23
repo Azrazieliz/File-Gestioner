@@ -74,8 +74,7 @@ source=source.replace(anchor,'''        @JavascriptInterface public String getBo
             if(active==null)return "{}";
             try{return active.chapter(index).toString();}
             catch(Exception e){
-                return new org.json.JSONObject()
-                    .put("error",message(e)).toString();
+                return "{\"error\":"+UniversalReader.quote(message(e))+"}";
             }
         }
         @JavascriptInterface public String getBookImages(){
