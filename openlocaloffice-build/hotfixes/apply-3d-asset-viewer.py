@@ -129,10 +129,10 @@ css.write_text(css.read_text()+r"""
 gradle=Path("app/build.gradle.kts")
 g=gradle.read_text()
 import re
-g, count=re.subn(r"versionCode\\s*=\\s*(\\d+)",
+g, count=re.subn(r"versionCode\s*=\s*(\d+)",
     lambda match: "versionCode = "+str(int(match.group(1))+1),g,count=1)
 assert count==1
-g, count=re.subn(r'versionName\\s*=\\s*"[^"]+"',
+g, count=re.subn(r'versionName\s*=\s*"[^"]+"',
     'versionName = "0.10.0"',g,count=1)
 assert count==1
 gradle.write_text(g)
