@@ -141,6 +141,10 @@ replace_once('        @JavascriptInterface public void saveCopy(){',
             try {return docx==null?0:RichDocxPreview.blockCount(docx.serialize());}
             catch(Exception e){return 0;}
         }
+        @JavascriptInterface public int findDocxBlock(String needle,int start) {
+            try {return docx==null?-1:RichDocxPreview.find(docx.serialize(),needle,start);}
+            catch(Exception e){return -1;}
+        }
         @JavascriptInterface public String getDocxRichWindow(int start,int count) {
             try {return docx==null?"[]":RichDocxPreview.window(docx.serialize(),start,count);}
             catch(Exception e){return "[]";}
