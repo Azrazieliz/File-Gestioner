@@ -26,7 +26,8 @@ repl(java,
     '''    private static boolean isModelType(String type) {
         return Arrays.asList("glb","gltf","obj","fbx","stl","ply",
             "dae","3mf","3ds","amf","usdz","usda","usdc",
-            "blend","blend1","unity3d","assetbundle","zipmod").contains(type);
+            "blend","blend1","unity3d","assetbundle","zipmod",
+            "uasset","umap","pmx","pmd","vrm").contains(type);
     }
     private static String modelMime(String type) {
         if ("glb".equals(type))return "model/gltf-binary";
@@ -60,7 +61,7 @@ java.write_text(j)
 j=java.read_text()
 source_anchor='                if ("pdf".equals(quickType)) {'
 assert source_anchor in j
-j=j.replace(source_anchor,r'''                if (Arrays.asList("blend","blend1","unity3d","assetbundle","zipmod").contains(quickType)) {
+j=j.replace(source_anchor,r'''                if (Arrays.asList("blend","blend1","unity3d","assetbundle","zipmod","uasset","umap","pmx","pmd").contains(quickType)) {
                     xlsx=null; csv=null; docx=null; sdocx=null;
                     rawDocument=null; textDocument=null;
                     currentUri=uri; currentName=name; currentType=quickType;
