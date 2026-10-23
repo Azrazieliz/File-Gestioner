@@ -95,6 +95,8 @@ jobs:
           python3 ../hotfixes/apply-image-zip-reader-polish.py
           python3 ../hotfixes/apply-premium-library-native.py
           python3 ../hotfixes/apply-premium-v13-reader.py
+          python3 ../hotfixes/apply-native-reader-back.py
+          python3 ../hotfixes/apply-epub-covers-navigation-v131.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -131,6 +133,11 @@ jobs:
           node ../hotfixes/test-archive-saf-regression.cjs
           node --check app/src/main/assets/premium-library.js
           node ../hotfixes/test-premium-v13.cjs
+          node ../hotfixes/test-epub-cover-back-regression.cjs
+          grep -Fq 'onBackPressed' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'getOnBackInvokedDispatcher' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'EPUB_READY' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'fg-lib-has-image' app/src/main/assets/style.css
           grep -Fq 'new SeekableZip(handle)' app/src/main/java/com/openlocal/office/core/BookArchive.java
           grep -Fq 'premium-library.js' app/src/main/assets/index.html
           grep -Fq 'ReaderLibrary.Listing' app/src/main/java/com/openlocal/office/MainActivity.java
@@ -275,9 +282,7 @@ jobs:
             adb shell am start -W -n com.openlocal.office/.MainActivity
             sleep 3
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "File Gestioner failed to launch"; exit 1; }
-            adb logcat -d -s FG_READER_UI:I | grep -F 'LIBRARY_READY' || {
-              echo "The library WebView UI did not finish initializing"; exit 1
-            }
+            adb logcat -d -s FG_READER_UI:I | grep -Fq 'LIBRARY_READY' || exit 1
             mkdir -p screenshots
             adb exec-out screencap -p > screenshots/fg-reader-home.png
             test -s screenshots/fg-reader-home.png
@@ -289,6 +294,15 @@ jobs:
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "Book opening crashed Android process"; exit 1; }
             adb exec-out screencap -p > screenshots/fg-86mib-epub.png
             test -s screenshots/fg-86mib-epub.png
+            adb logcat -d -s FG_EPUB:I | tee screenshots/epub-startup.txt
+            grep -Eq 'EPUB_READY chapters=2 images=1' screenshots/epub-startup.txt || exit 1
+            adb logcat -d -s FG_READER_UI:I | tee screenshots/book-image-events.txt
+            grep -Fq 'BOOK_IMAGE_LOADED' screenshots/book-image-events.txt || exit 1
+            adb shell input keyevent KEYCODE_BACK
+            sleep 1
+            adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || exit 1
+            adb logcat -d -s FG_READER_UI:I | tee screenshots/back-events.txt
+            grep -Fq 'BACK_TO_LIBRARY' screenshots/back-events.txt || exit 1
             python3 openlocaloffice-build/hotfixes/create-image-zip-fixture.py /tmp/fg-102-images.zip
             adb exec-in run-as com.openlocal.office sh -c 'cat > files/fg-102-images.zip' < /tmp/fg-102-images.zip
             adb shell am start -W -n com.openlocal.office/.MainActivity -a android.intent.action.VIEW -t application/zip -d file:///data/user/0/com.openlocal.office/files/fg-102-images.zip
@@ -296,13 +310,8 @@ jobs:
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "ZIP comic reader crashed"; exit 1; }
             adb logcat -d -s FG_ARCHIVE:I | tee screenshots/archive-index-benchmark.txt
             adb logcat -d -s FG_READER_UI:I | tee screenshots/reader-ui-events.txt
-            grep -F 'COMIC_IMAGE_LOADED' screenshots/reader-ui-events.txt || {
-              echo "The 102-page ZIP was indexed but the actual comic page did not decode"; exit 1
-            }
-            grep -Eq 'ZIP_READY count=102 comic=true elapsed_ms=[0-9]+' screenshots/archive-index-benchmark.txt || {
-              echo "The >30MiB ZIP did not successfully index all 102 images in comic mode"
-              exit 1
-            }
+            grep -Fq 'COMIC_IMAGE_LOADED' screenshots/reader-ui-events.txt || exit 1
+            grep -Eq 'ZIP_READY count=102 comic=true elapsed_ms=[0-9]+' screenshots/archive-index-benchmark.txt || exit 1
             adb exec-out screencap -p > screenshots/fg-102-image-zip.png
             test -s screenshots/fg-102-image-zip.png
             rm -f /tmp/fg-102-images.zip
