@@ -40,10 +40,10 @@ else:
 main.write_text(java)
 gradle=Path("app/build.gradle.kts")
 version=gradle.read_text()
-version,n=re.subn(r'versionCode\\s*=\\s*(\\d+)',
+version,n=re.subn(r'versionCode\s*=\s*(\d+)',
     lambda match:"versionCode = "+str(int(match.group(1))+1),version,count=1)
 assert n==1,"Missing Android versionCode"
-version,n=re.subn(r'versionName\\s*=\\s*"[^"]+"',
+version,n=re.subn(r'versionName\s*=\s*"[^"]+"',
     'versionName = "0.13.1"',version,count=1)
 assert n==1,"Missing Android versionName"
 gradle.write_text(version)
