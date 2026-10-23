@@ -291,6 +291,11 @@ jobs:
             adb shell am start -W -n com.openlocal.office/.MainActivity -a android.intent.action.VIEW -t application/zip -d file:///data/user/0/com.openlocal.office/files/fg-102-images.zip
             sleep 4
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "ZIP comic reader crashed"; exit 1; }
+            adb logcat -d -s FG_ARCHIVE:I | tee screenshots/archive-index-benchmark.txt
+            grep -Eq 'ZIP_READY count=102 comic=true elapsed_ms=[0-9]+' screenshots/archive-index-benchmark.txt || {
+              echo "The >30MiB ZIP did not successfully index all 102 images in comic mode"
+              exit 1
+            }
             adb exec-out screencap -p > screenshots/fg-102-image-zip.png
             test -s screenshots/fg-102-image-zip.png
             rm -f /tmp/fg-102-images.zip
