@@ -8,6 +8,7 @@ on:
       - 'openlocaloffice-build/**'
       - '.github/workflows/openlocaloffice-build.yml'
   workflow_dispatch:
+  pull_request:
 
 jobs:
   build:
@@ -139,6 +140,16 @@ jobs:
           grep -Fq '.sdocxEditor{' app/src/main/assets/style.css
           ! grep -q 'SDOCX preview is read-only' app/src/main/java/com/openlocal/office/MainActivity.java
           ! grep -q 'Page →' app/src/main/assets/app.js
+
+      - name: Export assembled source for implementation audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-gestioner-expanded-source
+          path: |
+            openlocaloffice-build/project/app/src/main/java/
+            openlocaloffice-build/project/app/src/main/assets/
+            openlocaloffice-build/project/app/src/main/AndroidManifest.xml
+          retention-days: 1
 
       - name: Build debug APK
         working-directory: openlocaloffice-build/project
