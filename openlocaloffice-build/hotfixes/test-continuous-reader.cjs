@@ -111,6 +111,20 @@ assert.strictEqual(visit(root,x=>x.className.includes('fg-comic-section')).lengt
                    'All comic images belong to one scrollable surface');
 assert(!buttons().includes('‹')&&!buttons().includes('›'),
        'Comics must not use slide navigation');
+currentArchive=JSON.stringify([
+ {name:'Book/10.webp',size:300,preview:true,streamed:true},
+ {name:'Book/2.webp',size:280,preview:true,streamed:true},
+ {name:'Book/1.webp',size:245,preview:true,streamed:true}
+]);
+win.loadDocument({type:'archive',name:'Comics.zip',format:'zip',comicMode:true,streamed:true});
+const images=visit(root,x=>x.className.includes('fg-comic-section'));
+assert.strictEqual(images.length,3,'An image-heavy ZIP must render as a continuous comic');
+assert.strictEqual(images[0].attributes['aria-label'],'Comic image 1 Book/1.webp',
+  'Comic ZIP pages must be numerically ordered, 1 then 2 then 10');
+assert.strictEqual(images[1].attributes['aria-label'],'Comic image 2 Book/2.webp');
+assert(!buttons().includes('‹')&&!buttons().includes('›'),
+  'Image ZIP must not use slideshow controls');
+assert(buttons().includes('Files'),'ZIP comic has a non-default file-list option');
 currentArchive=JSON.stringify([{name:'notes.txt',size:500,preview:true}]);
 win.loadDocument({type:'archive',name:'ZIP',format:'zip',readOnly:true});
 assert.strictEqual(visit(root,x=>x.tagName==='details').length,1,

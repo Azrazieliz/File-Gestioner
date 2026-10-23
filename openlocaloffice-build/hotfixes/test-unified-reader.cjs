@@ -42,7 +42,8 @@ const mockWindow={
       case 'image':current['.fg-image-surface']=scroll;current['.fg-display-image']=target;break;
       case 'archive':
         current['.fg-archive-scroll']=scroll;
-        current[d.format==='cbz'?'.fg-comic-stack':'.fg-archive-list']=target;break;
+        current[(d.format==='cbz'||d.comicMode===true)&&!d.forceArchiveList?
+          '.fg-comic-stack':'.fg-archive-list']=target;break;
       case 'binary':current['.fg-reader-scroll']=scroll;current['.fg-document-sheet']=target;break;
     }
   }
@@ -57,7 +58,8 @@ function flush(){while(callbacks.length)callbacks.shift()();}
 for(const d of [
  {type:'reader',format:'txt'}, {type:'reader',format:'epub'},
  {type:'docx',format:'docx'},{type:'image',format:'png'},
- {type:'archive',format:'cbz'},{type:'archive',format:'zip'},
+ {type:'archive',format:'cbz'},{type:'archive',format:'zip',comicMode:true},
+ {type:'archive',format:'zip'},
  {type:'binary',format:'bin'},{type:'spreadsheet',format:'xlsx'},
  {type:'sdocx',format:'sdocx'}
 ]){
@@ -68,7 +70,7 @@ for(const d of [
  assert(dock,'Missing floating zoom dock for '+d.type);
  assert.strictEqual(dock.children.length,4,'Unified dock must expose zoom out, scale, zoom in, fit');
  dock.children[2].listeners.click[0]();
- if(d.type==='image'||d.format==='cbz')
+ if(d.type==='image'||d.format==='cbz'||d.comicMode===true)
    assert.strictEqual(active.target.style.width,'125%','Visual zoom must change real width');
  else if(d.type==='spreadsheet'||d.format==='zip')
    assert.strictEqual(active.target.style.zoom,'1.25','Native office/archive zoom must change layout');

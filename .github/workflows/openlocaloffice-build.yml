@@ -90,6 +90,8 @@ jobs:
           python3 ../hotfixes/apply-streamed-large-readers.py
           cp ../additions/epub-reader.js app/src/main/assets/epub-reader.js
           python3 ../hotfixes/apply-premium-book-ui.py
+          python3 ../hotfixes/apply-saf-recent-permissions.py
+          python3 ../hotfixes/apply-image-zip-reader-polish.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -119,6 +121,12 @@ jobs:
           node ../hotfixes/test-unified-reader.cjs
           node --check app/src/main/assets/epub-reader.js
           node ../hotfixes/test-premium-book-reader.cjs
+          grep -Fq 'candidate.comicLike()' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'getPersistedUriPermissions()' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'OS' app/src/main/java/com/openlocal/office/core/BookArchive.java || true
+          grep -Fq 'Comic ZIP' ../hotfixes/test-archive-saf-regression.cjs
+          node ../hotfixes/test-archive-saf-regression.cjs
+          grep -Fq '0.12.1' app/src/main/assets/style.css
           grep -Fq 'fg-book-mode' app/src/main/assets/style.css
           grep -Fq 'epub-reader.js' app/src/main/assets/index.html
           grep -Fq 'BookArchive candidate' app/src/main/java/com/openlocal/office/MainActivity.java
@@ -269,6 +277,14 @@ jobs:
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "Book opening crashed Android process"; exit 1; }
             adb exec-out screencap -p > screenshots/fg-86mib-epub.png
             test -s screenshots/fg-86mib-epub.png
+            python3 openlocaloffice-build/hotfixes/create-image-zip-fixture.py /tmp/fg-102-images.zip
+            adb exec-in run-as com.openlocal.office sh -c 'cat > files/fg-102-images.zip' < /tmp/fg-102-images.zip
+            adb shell am start -W -n com.openlocal.office/.MainActivity -a android.intent.action.VIEW -t application/zip -d file:///data/user/0/com.openlocal.office/files/fg-102-images.zip
+            sleep 4
+            adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "ZIP comic reader crashed"; exit 1; }
+            adb exec-out screencap -p > screenshots/fg-102-image-zip.png
+            test -s screenshots/fg-102-image-zip.png
+            rm -f /tmp/fg-102-images.zip
             rm -f /tmp/fg-large-book.epub
             adb logcat -b crash -d | tee screenshots/crash-log.txt
             if grep -q 'FATAL EXCEPTION' screenshots/crash-log.txt; then exit 1; fi

@@ -2,6 +2,10 @@ package com.openlocal.office.core;
 
 import android.content.Context;
 import android.net.Uri;
+import android.database.Cursor;
+import android.provider.OpenableColumns;
+import android.system.Os;
+import android.system.OsConstants;
 import android.os.ParcelFileDescriptor;
 import android.webkit.WebResourceResponse;
 import org.json.JSONArray;
@@ -51,25 +55,58 @@ public final class BookArchive implements Closeable {
         try {
             handle=context.getContentResolver().openFileDescriptor(uri,"r");
             if(handle==null)throw new IOException("Cannot read this document provider");
+            long advertised=providerLength();
+            long physical=handle.getStatSize();
+            // A cloud provider can publish the intended size while still
+            // downloading the file. Do not treat its partial local payload as
+            // a valid permanent source or blindly copy it again.
+            if(advertised>0&&physical>=0&&physical<advertised){
+                throw new IOException("The cloud document is incomplete ("+
+                    physical+" / "+advertised+" bytes). Complete Round Sync download first.");
+            }
+            boolean seekable=false;
+            try {
+                Os.lseek(handle.getFileDescriptor(),0L,OsConstants.SEEK_CUR);
+                seekable=true;
+            } catch(Exception unsupported) {
+                // Providers offering only pipes need one bounded-disk spool.
+            }
             try {
                 // Seekable providers: ZipFile opens the original SAF descriptor
                 // via /proc/self/fd. No copy, even for multi-gigabyte books.
                 opened=new ZipFile("/proc/self/fd/"+handle.getFd());
             } catch(Exception unsupported) {
-                // Virtual/non-seekable provider: copy in bounded 128 KiB buffers,
+                if(seekable){
+                    // If the FD is seekable, copying the entire already-staged
+                    // Round Sync/TeraBox file will not repair an incomplete ZIP.
+                    // Avoid Asterion-style redundant transfer work.
+                    throw new IOException("This ZIP is incomplete, damaged, or cannot be indexed directly. "+
+                        "Check that Round Sync finished downloading it.",unsupported);
+                }
+                // True streaming/pipe provider: a single disk spool is needed
+                // for ZIP central-directory random access. Never heap-copy.
                 // never into a Java byte[]. Requires device cache free space.
                 File dir=new File(context.getCacheDir(),"reading");
                 if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create offline reading cache");
                 temp=File.createTempFile("book-",".zip",dir);
+                long copied=0L;
                 try(InputStream input=context.getContentResolver().openInputStream(uri);
                     OutputStream output=new BufferedOutputStream(new FileOutputStream(temp),128*1024)){
                     if(input==null)throw new IOException("The document provider could not stream this book");
                     byte[] buffer=new byte[128*1024];
                     int n;
-                    while((n=input.read(buffer))!=-1)output.write(buffer,0,n);
+                    while((n=input.read(buffer))!=-1){
+                        output.write(buffer,0,n);
+                        copied+=n;
+                    }
                 }catch(IOException e){
                     temp.delete();
                     throw new IOException("The provider is not seekable and the book cannot be cached. Check available device storage.",e);
+                }
+                // Catch truncated provider transfer before indexing the ZIP.
+                if(advertised>0&&copied!=advertised){
+                    throw new IOException("Cloud transfer incomplete: copied "+
+                        copied+" / "+advertised+" bytes.");
                 }
                 opened=new ZipFile(temp);
             }
@@ -87,6 +124,9 @@ public final class BookArchive implements Closeable {
                     if(isImage(name))archiveImages.add(name);
                 }
             }
+            // Comic reading order is 1, 2, 3 ... 10, NOT 1, 10, 2.
+            archiveImages.sort(BookArchive::compareNatural);
+            archiveAll.sort(BookArchive::compareNatural);
             if(epub)readPackage();
         }catch(Exception failure){
             if(opened!=null)try{opened.close();}catch(IOException ignored){}
@@ -95,11 +135,59 @@ public final class BookArchive implements Closeable {
             throw failure;
         }
     }
+    private long providerLength(){
+        try(Cursor cursor=context.getContentResolver().query(uri,
+            new String[]{OpenableColumns.SIZE},null,null,null)){
+            if(cursor!=null&&cursor.moveToFirst()&&!cursor.isNull(0))
+                return cursor.getLong(0);
+        }catch(Exception ignored){}
+        return -1L;
+    }
     public String token(){return token;}
     public String title(){return bookTitle;}
     public String author(){return author;}
     public int chapterCount(){return chapters.size();}
     public int imageCount(){return archiveImages.size();}
+    /** A ZIP is a comic when nearly all displayable entries are image pages,
+     * independent of the ZIP extension or enclosing directory name.
+     * Metadata/hidden files do not influence classification. */
+    public boolean comicLike(){
+        if(archiveImages.size()<2)return false;
+        int readable=0;
+        for(String name:archiveAll){
+            String base=name.substring(name.lastIndexOf('/')+1);
+            if(base.startsWith(".")||name.startsWith("__MACOSX/")||
+               base.equalsIgnoreCase("Thumbs.db"))continue;
+            readable++;
+        }
+        return readable>=2&&archiveImages.size()*10L>=readable*8L;
+    }
+    public static int compareNatural(String left,String right){
+        int a=0,b=0;
+        while(a<left.length()&&b<right.length()){
+            char ac=left.charAt(a),bc=right.charAt(b);
+            if(Character.isDigit(ac)&&Character.isDigit(bc)){
+                int ae=a,be=b;
+                while(ae<left.length()&&Character.isDigit(left.charAt(ae)))ae++;
+                while(be<right.length()&&Character.isDigit(right.charAt(be)))be++;
+                int as=a;while(as<ae&&left.charAt(as)=='0')as++;
+                int bs=b;while(bs<be&&right.charAt(bs)=='0')bs++;
+                int al=ae-as,bl=be-bs;
+                if(al!=bl)return Integer.compare(al,bl);
+                for(int k=0;k<al;k++){
+                    int cmp=Character.compare(left.charAt(as+k),right.charAt(bs+k));
+                    if(cmp!=0)return cmp;
+                }
+                if(ae-a!=be-b)return Integer.compare(ae-a,be-b);
+                a=ae;b=be;
+            }else{
+                int cmp=Character.compare(Character.toLowerCase(ac),Character.toLowerCase(bc));
+                if(cmp!=0)return cmp;
+                a++;b++;
+            }
+        }
+        return Integer.compare(left.length()-a,right.length()-b);
+    }
     public String imageName(int index){return archiveImages.get(index);}
     public String assetUrl(String name){return "https://fg-assets.invalid/book/"+token+"/"+encodePath(name);}
     public JSONObject metadata() throws Exception {

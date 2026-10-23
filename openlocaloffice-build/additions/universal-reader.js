@@ -476,13 +476,26 @@ function docx(){
 function archive(){
  let entries=[];
  try{entries=JSON.parse(bridge()?.getArchiveEntries?.()||'[]');}catch(_){}
- if(doc.format==='cbz')entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(e.name));
- const [bar,tools]=toolbar(doc.format==='cbz'?
-    'Continuous comic · scroll down through every image':
-    'Archive contents · scroll and expand entries');
+ const isComic=(doc.format==='cbz'||doc.comicMode===true)&&!doc.forceArchiveList;
+ if(isComic){
+   entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif|heic|heif)$/i.test(e.name));
+   entries.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+ }
+ const [bar,tools]=toolbar('');
+ const changeMode=mode=>window.loadDocument({
+   ...doc,comicMode:mode,forceArchiveList:!mode
+ });
+ // Each image-first ZIP opens in uninterrupted comic mode; the file list
+ // is available on demand, never imposed as the default reading surface.
+ if(doc.format==='zip'||doc.comicMode===true||doc.forceArchiveList){
+   tools.appendChild(button(isComic?'Files':'Read images',
+     ()=>changeMode(!isComic)));
+ }
  const body=E('div','fg-reader-scroll fg-archive-scroll');
  body.setAttribute('role','document');
- tools.appendChild(E('span','fg-reader-counter',entries.length+' entries'));
+ const position=E('span','fg-reader-counter',isComic?
+   '1 / '+entries.length:entries.length+' files');
+ tools.appendChild(position);
  if(!entries.length){
    body.appendChild(E('p','fg-reader-empty','Archive has no previewable entries.'));
    stage(bar,body);return;
@@ -512,7 +525,7 @@ function archive(){
        'Cannot preview '+entry.name+': '+String(error.message||error)));
    }
  }
- if(doc.format==='cbz'){
+ if(isComic){
    const stack=E('div','fg-pdf-stack fg-comic-stack'),cells=[],loaded=new Map();
    let disposed=false,observer=null,scheduled=false;
    const queue=new Set();
@@ -567,6 +580,15 @@ function archive(){
      if(raf)return;
      raf=requestAnimationFrame(()=>{
        raf=0;trim();
+       const center=body.getBoundingClientRect().top+body.clientHeight*.35;
+       let best=0,minimum=Infinity;
+       for(let i=0;i<cells.length;i++){
+         const rect=cells[i].getBoundingClientRect();
+         const distance=center<rect.top?rect.top-center:center>rect.bottom?
+           center-rect.bottom:0;
+         if(distance<minimum){minimum=distance;best=i;if(!distance)break;}
+       }
+       position.textContent=(best+1)+' / '+entries.length;
        if(!observer){
          const top=body.getBoundingClientRect().top;
          cells.forEach((c,i)=>{

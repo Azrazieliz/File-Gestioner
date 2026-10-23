@@ -52,9 +52,10 @@ function locate(doc){
   }
   if(doc.type==='archive'){
     const scroller=find('.fg-archive-scroll');
-    const target=find(doc.format==='cbz'?'.fg-comic-stack':'.fg-archive-list');
-    return target&&scroller?{mode:doc.format==='cbz'?'width':'layout',
-      scroller,target,kind:doc.format==='cbz'?'comic':'archive'}:null;
+    const comic=(doc.format==='cbz'||doc.comicMode===true)&&!doc.forceArchiveList;
+    const target=find(comic?'.fg-comic-stack':'.fg-archive-list');
+    return target&&scroller?{mode:comic?'width':'layout',
+      scroller,target,kind:comic?'comic':'archive'}:null;
   }
   return null;
 }
