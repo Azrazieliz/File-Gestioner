@@ -112,6 +112,52 @@ function parse(format,buffer){
     default:throw Error('Unsupported model format: '+format+'. Native .blend/.max/.ma projects require an export to GLB or FBX.');
   }
 }
+
+/* NoWorld glTF custom extras are inspection metadata, never approvals. */
+function findNoWorldReceipt(root){
+  let found=null;
+  const inspect=(node)=>{
+    if(found)return;
+    const data=node?.userData?.noworld_asset;
+    if(!data)return;
+    try {
+      const value=typeof data==='string'?JSON.parse(data):data;
+      if(value?.schema==='noworld.asset.preview.v1' &&
+         value?.project==='NoWorld: False Horizon' && value.asset_id)
+        found=value;
+    }catch(_){}
+  };
+  inspect(root);
+  root.traverse(inspect);
+  return found;
+}
+function noWorldPanel(metadata){
+  const panel=E('section','fg-3d-noworld');
+  panel.appendChild(E('div','fg-3d-noworld-title','NoWorld · Source-linked asset preview'));
+  const grid=E('div','fg-3d-noworld-grid');
+  const entries=[
+    ['Asset ID',metadata.asset_id],
+    ['Gate',metadata.gate],
+    ['Source lane',metadata.source_lane],
+    ['Source file',metadata.source_file],
+    ['Source SHA-256',metadata.source_sha256],
+    ['Unreal destination',metadata.ue_target],
+    ['Source review',metadata.source_review || 'PENDING'],
+    ['Art acceptance',metadata.art_acceptance || 'NOT_APPROVED'],
+    ['Unreal native import',metadata.unreal_native_import || 'NOT_TESTED'],
+    ['Device QA',metadata.device_validation || 'NOT_TESTED']
+  ];
+  for(const [key,value] of entries){
+    if(value===undefined||value===null||value==='')continue;
+    grid.append(E('span','fg-3d-noworld-key',key),
+                E('span','fg-3d-noworld-value',String(value).slice(0,256)));
+  }
+  panel.appendChild(grid);
+  panel.appendChild(E('div','fg-3d-noworld-key',
+    'Mobile preview only · source bones/skin/animations and UE validation must be checked separately · no production approval inferred.'));
+  return panel;
+}
+
 function open(doc,host,bridge){
   reset();
   const rootUI=E('div','fg-3d-app');
@@ -138,6 +184,19 @@ function open(doc,host,bridge){
   active=state;
   const isOld=()=>state.dead||active!==state;
   const status=t=>{if(!isOld())overlay.textContent=t;};
+
+  // Native authoring formats may be multi-gigabyte and are NOT meshes ready
+  // for WebGL. Never load their binary bytes or claim to convert them on phone.
+  if(doc.requiresConversion ||
+     ['blend','blend1','unity3d','assetbundle','zipmod'].includes(
+       String(doc.format||'').toLowerCase())){
+    overlay.textContent='Native source file · conversion required\n'
+      + 'Blender .blend: export an independent .glb preview with Blender 5.2.2.\n'
+      + 'Koikatsu cards / .unity3d / .zipmod: first export a legitimate FBX or GLB using the installed NoWorld + KKBP toolchain.\n'
+      + 'The original project, cards, skeleton and mods remain unchanged.';
+    info.textContent='Open the exported GLB here to inspect geometry, rig and animation and see NoWorld provenance. This phone viewer does not contain the Windows Blender/Koikatsu software.';
+    return;
+  }
   const load=async()=>{
     try{
       if(!bridge)throw Error('Android file bridge is unavailable.');
@@ -204,6 +263,8 @@ function open(doc,host,bridge){
       });
       if(!meshes)throw Error('The model loaded but has no displayable meshes.');
       info.textContent=`${meshes.toLocaleString()} objects · ${vertices.toLocaleString()} vertices · ${faces.toLocaleString()} triangles · ${materials} materials · ${(buffer.byteLength/1048576).toFixed(1)} MiB`;
+      const nw=findNoWorldReceipt(model);
+      if(nw)rootUI.appendChild(noWorldPanel(nw));
       actions.append(q('Fit',fit));
       let wire=false;
       actions.append(q('Wireframe',()=>{
@@ -251,4 +312,4 @@ function open(doc,host,bridge){
   };
   load();
 }
-window.FileGestionerModelViewer={open,dispose:reset,formats:['glb','gltf','obj','fbx','stl','ply','dae','3mf','3ds','amf','usdz','usda','usdc']};
+window.FileGestionerModelViewer={open,dispose:reset,formats:['glb','gltf','obj','fbx','stl','ply','dae','3mf','3ds','amf','usdz','usda','usdc','blend','blend1','unity3d','assetbundle','zipmod']};
