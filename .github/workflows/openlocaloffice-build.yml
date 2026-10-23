@@ -78,6 +78,7 @@ jobs:
           cp ../additions/universal-reader.js app/src/main/assets/universal-reader.js
           python3 ../hotfixes/apply-universal-reader-backend.py
           python3 ../hotfixes/apply-universal-reader-ui.py
+          bash ../hotfixes/test-rich-docx-reader.sh
           node --check app/src/main/assets/universal-reader.js
           grep -Fq 'getPdfPage' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'UniversalReader.extractDocument' app/src/main/java/com/openlocal/office/MainActivity.java
