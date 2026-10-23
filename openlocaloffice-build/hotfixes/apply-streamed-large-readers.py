@@ -54,7 +54,8 @@ once('''                if ("epub".equals(quickType)) {''',r'''                i
                     remember(uri,name,currentMime);
                     String payload="{\"type\":\"archive\",\"name\":"+q(name)+
                         ",\"format\":"+q(quickType)+
-                        ",\"streamed\":true,\"readOnly\":true}";
+                        ",\"streamed\":true,\"comicMode\":"+candidate.comicLike()+
+                        ",\"readOnly\":true}";
                     runOnUiThread(()->js("window.loadDocument("+payload+")"));
                     return;
                 }
