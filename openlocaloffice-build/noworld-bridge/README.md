@@ -37,23 +37,23 @@ No additional installs or original-game changes are made here.
 ### Example: NoWorld Blender source
 
 ```powershell
-py -3 noworld_asset_bridge.py probe
+& "D:\\Tools\\Python311\\python.exe" .\\noworld_asset_bridge.py probe
 
-py -3 noworld_asset_bridge.py export \
-  --input "D:\NoWorld_Art_Production\P03_Kingdom_River_Citadel_Environment\NW_Kingdom_RiverVale_P32_GROUNDED_URBAN_CORE.blend" \
-  --output "D:\NoWorld_Art_Production\MobilePreviews\NW_RiverVale_P32.glb" \
-  --asset-id "NW-RiverVale-P32" --gate "GATE03" --source-lane BLENDER \
+& "D:\\Tools\\Python311\\python.exe" .\\noworld_asset_bridge.py export `
+  --input "D:\NoWorld_Art_Production\P03_Kingdom_River_Citadel_Environment\NW_Kingdom_RiverVale_P32_GROUNDED_URBAN_CORE.blend" `
+  --output "D:\NoWorld_Art_Production\MobilePreviews\NW_RiverVale_P32.glb" `
+  --asset-id "NW-RiverVale-P32" --gate "GATE03" --source-lane BLENDER `
   --ue-target "/Game/Experimental/FirstWorldR1"
 ```
 
 ### Example: real Koikatsu-derived FBX source
 
 ```powershell
-py -3 noworld_asset_bridge.py export \
-  --input "D:\UnrealProjects\Gate09_Protected_Production_20261016\UnrealInterchange_20261019\G09_LuminousV3_Idle_01_Thoughtful.fbx" \
-  --output "D:\NoWorld_Art_Production\MobilePreviews\G09_Luminous_Thoughtful.glb" \
-  --asset-id "G09-LuminousV3-Idle-01" --gate "GATE09" \
-  --source-lane KOIKATSU_EXPORTED \
+& "D:\\Tools\\Python311\\python.exe" .\\noworld_asset_bridge.py export `
+  --input "D:\UnrealProjects\Gate09_Protected_Production_20261016\UnrealInterchange_20261019\G09_LuminousV3_Idle_01_Thoughtful.fbx" `
+  --output "D:\NoWorld_Art_Production\MobilePreviews\G09_Luminous_Thoughtful.glb" `
+  --asset-id "G09-LuminousV3-Idle-01" --gate "GATE09" `
+  --source-lane KOIKATSU_EXPORTED `
   --ue-target "/Game/Experimental/Gate12Koikatsu"
 ```
 
