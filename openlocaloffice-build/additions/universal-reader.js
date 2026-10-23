@@ -476,10 +476,21 @@ function docx(){
 function archive(){
  let entries=[];
  try{entries=JSON.parse(bridge()?.getArchiveEntries?.()||'[]');}catch(_){}
- if(doc.format==='cbz')entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(e.name));
- const [bar,tools]=toolbar(doc.format==='cbz'?
-    'Continuous comic · scroll down through every image':
-    'Archive contents · scroll and expand entries');
+ const isComic=(doc.format==='cbz'||doc.comicMode===true)&&!doc.forceArchiveList;
+ if(isComic){
+   entries=entries.filter(e=>/\.(png|jpe?g|gif|webp|bmp|avif|heic|heif)$/i.test(e.name));
+   entries.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+ }
+ const [bar,tools]=toolbar('');
+ const changeMode=mode=>window.loadDocument({
+   ...doc,comicMode:mode,forceArchiveList:!mode
+ });
+ // Each image-first ZIP opens in uninterrupted comic mode; the file list
+ // is available on demand, never imposed as the default reading surface.
+ if(doc.format==='zip'||doc.comicMode===true||doc.forceArchiveList){
+   tools.appendChild(button(isComic?'Files':'Read images',
+     ()=>changeMode(!isComic)));
+ }
  const body=E('div','fg-reader-scroll fg-archive-scroll');
  body.setAttribute('role','document');
  tools.appendChild(E('span','fg-reader-counter',entries.length+' entries'));
@@ -512,7 +523,7 @@ function archive(){
        'Cannot preview '+entry.name+': '+String(error.message||error)));
    }
  }
- if(doc.format==='cbz'){
+ if(isComic){
    const stack=E('div','fg-pdf-stack fg-comic-stack'),cells=[],loaded=new Map();
    let disposed=false,observer=null,scheduled=false;
    const queue=new Set();
