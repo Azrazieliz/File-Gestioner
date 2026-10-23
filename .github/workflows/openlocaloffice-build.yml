@@ -90,6 +90,8 @@ jobs:
           python3 ../hotfixes/apply-streamed-large-readers.py
           cp ../additions/epub-reader.js app/src/main/assets/epub-reader.js
           python3 ../hotfixes/apply-premium-book-ui.py
+          python3 ../hotfixes/apply-saf-recent-permissions.py
+          python3 ../hotfixes/apply-image-zip-reader-polish.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -119,6 +121,12 @@ jobs:
           node ../hotfixes/test-unified-reader.cjs
           node --check app/src/main/assets/epub-reader.js
           node ../hotfixes/test-premium-book-reader.cjs
+          grep -Fq 'candidate.comicLike()' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'getPersistedUriPermissions()' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'OS' app/src/main/java/com/openlocal/office/core/BookArchive.java || true
+          grep -Fq 'Comic ZIP' ../hotfixes/test-archive-saf-regression.cjs
+          node ../hotfixes/test-archive-saf-regression.cjs
+          grep -Fq '0.12.1' app/src/main/assets/style.css
           grep -Fq 'fg-book-mode' app/src/main/assets/style.css
           grep -Fq 'epub-reader.js' app/src/main/assets/index.html
           grep -Fq 'BookArchive candidate' app/src/main/java/com/openlocal/office/MainActivity.java
