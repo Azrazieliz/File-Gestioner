@@ -14,8 +14,8 @@ replace_once('private static final long MAX_FILE_BYTES = 40L * 1024L * 1024L;',
              'private static final long MAX_FILE_BYTES = 80L * 1024L * 1024L;')
 replace_once('                long size = displaySize(uri);',
 '''                String quickType = detectType(uri, name);
-                if ("mp3".equals(quickType) || "mp4".equals(quickType)) {
-                    throw new IOException("MP3 and MP4 are not document formats and are deliberately excluded.");
+                if ("mp3".equals(quickType) || "mp4".equals(quickType) || "pptx".equals(quickType)) {
+                    throw new IOException("MP3, MP4 and PPTX are excluded from File Gestioner reading.");
                 }
                 if ("pdf".equals(quickType)) {
                     int pages = UniversalReader.pdfPages(this, uri);
@@ -32,7 +32,7 @@ replace_once('                long size = displaySize(uri);',
                 }
                 long size = displaySize(uri);''')
 replace_once('                } else if ("xls".equals(type)) {',
-'''                } else if ("pptx".equals(type) || "epub".equals(type) ||
+'''                } else if ("epub".equals(type) ||
                            "odt".equals(type) || "ods".equals(type) || "odp".equals(type)) {
                     textDocument = UniversalReader.extractDocument(bytes,type);
                     currentType = type; currentMime = mimeForPreview(type);
@@ -62,10 +62,15 @@ replace_once('                } else if ("xls".equals(type)) {',
                     }
                     currentType=type; currentMime=mimeForPreview(type);
                     json=readerJson(name,type,textDocument.length());
+                } else if ("doc".equals(type)) {
+                    textDocument=LegacyOfficeReader.read(bytes,"doc");
+                    currentType="doc"; currentMime=mimeForPreview(type);
+                    json = readerJson(name,type,textDocument.length());
                 } else if ("xls".equals(type)) {''')
 replace_once('                    throw new IOException("Legacy .xls is not included in this offline build. Save it as .xlsx first.");',
-'''                    rawDocument=bytes; currentType="xls"; currentMime=mimeForPreview(type);
-                    json = binaryJson(name,type,bytes.length);''')
+'''                    textDocument=LegacyOfficeReader.read(bytes,"xls");
+                    currentType="xls"; currentMime=mimeForPreview(type);
+                    json = readerJson(name,type,textDocument.length());''')
 replace_once('                    throw new IOException("Unsupported file. Open an .xlsx, .csv, .docx, .txt, .md or .sdocx file.");',
 '''                    rawDocument=bytes; currentType=type.isEmpty()?"unknown":type;
                     currentMime=mimeForPreview(type); json=binaryJson(name,currentType,bytes.length);''')
@@ -81,9 +86,10 @@ replace_once('    private byte[] serializeCurrent() throws Exception {',
             "gradle","gitignore","dockerfile").contains(type);
     }
     private static String mimeForPreview(String type) {
+        if ("doc".equals(type))return "application/msword";
+        if ("xls".equals(type))return "application/vnd.ms-excel";
         if ("pdf".equals(type))return "application/pdf";
         if ("epub".equals(type))return "application/epub+zip";
-        if ("pptx".equals(type))return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
         if ("odt".equals(type))return "application/vnd.oasis.opendocument.text";
         if ("ods".equals(type))return "application/vnd.oasis.opendocument.spreadsheet";
         if ("odp".equals(type))return "application/vnd.oasis.opendocument.presentation";
@@ -107,7 +113,7 @@ replace_once('    private byte[] serializeCurrent() throws Exception {',
 
     private byte[] serializeCurrent() throws Exception {''')
 replace_once('        if (xlsx != null) return xlsx.serialize();',
-'''        if (Arrays.asList("pdf","pptx","epub","odt","ods","odp","zip","cbz",
+'''        if (Arrays.asList("pdf","pptx","doc","epub","odt","ods","odp","zip","cbz",
               "image","rtf","html","htm","xls","unknown").contains(currentType) ||
               isImageType(currentType) || isTextType(currentType)) {
             throw new IOException("This format is available for reading only; editing the original is disabled.");
@@ -118,10 +124,12 @@ replace_once('    private String detectType(Uri uri,String name){',
 replace_once('        if("xlsx".equals(ext)||"csv".equals(ext)||"docx".equals(ext)||"txt".equals(ext)||"md".equals(ext)||"markdown".equals(ext)||"sdocx".equals(ext)||"xls".equals(ext))return ext;',
 '''        if(!ext.isEmpty() &&
            (Arrays.asList("xlsx","csv","docx","txt","md","markdown","sdocx","xls",
-              "pdf","pptx","epub","odt","ods","odp","zip","cbz","rtf","html","htm","mp3","mp4").contains(ext) ||
+              "pdf","pptx","epub","odt","ods","odp","zip","cbz","rtf","html","htm","doc","mp3","mp4").contains(ext) ||
              isImageType(ext) || isTextType(ext)))return ext;''')
 replace_once('        if("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(m))return "xlsx";',
-'''        if("application/pdf".equals(m))return "pdf";
+'''        if("application/msword".equals(m))return "doc";
+        if("application/vnd.ms-excel".equals(m))return "xls";
+        if("application/pdf".equals(m))return "pdf";
         if("application/epub+zip".equals(m))return "epub";
         if(m!=null && m.startsWith("image/"))return m.substring(6).replace("svg+xml","svg");
         if("application/vnd.openxmlformats-officedocument.presentationml.presentation".equals(m))return "pptx";
@@ -130,13 +138,23 @@ replace_once('        if("application/vnd.openxmlformats-officedocument.spreadsh
         if("application/vnd.oasis.opendocument.presentation".equals(m))return "odp";
         if("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet".equals(m))return "xlsx";''')
 replace_once('        return "";\n    }\n    private long displaySize',
-'''        if(m!=null && m.startsWith("text/"))return "txt";
+'''        if("audio/mpeg".equals(m))return "mp3";
+        if("video/mp4".equals(m))return "mp4";
+        if(m!=null && m.startsWith("text/"))return "txt";
         return "";
     }
     private long displaySize''')
 
 replace_once('        @JavascriptInterface public void saveCopy(){',
-'''        @JavascriptInterface public String getDocxRichWindow(int start,int count) {
+'''        @JavascriptInterface public int getDocxRichBlockCount() {
+            try {return docx==null?0:RichDocxPreview.blockCount(docx.serialize());}
+            catch(Exception e){return 0;}
+        }
+        @JavascriptInterface public int findDocxBlock(String needle,int start) {
+            try {return docx==null?-1:RichDocxPreview.find(docx.serialize(),needle,start);}
+            catch(Exception e){return -1;}
+        }
+        @JavascriptInterface public String getDocxRichWindow(int start,int count) {
             try {return docx==null?"[]":RichDocxPreview.window(docx.serialize(),start,count);}
             catch(Exception e){return "[]";}
         }
@@ -160,9 +178,10 @@ manifest=MANIFEST.read_text()
 anchor='<data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />'
 assert anchor in manifest
 manifest=manifest.replace(anchor,anchor+'''
+                <data android:mimeType="application/msword" />
+                <data android:mimeType="application/vnd.ms-excel" />
                 <data android:mimeType="application/pdf" />
                 <data android:mimeType="application/epub+zip" />
-                <data android:mimeType="application/vnd.openxmlformats-officedocument.presentationml.presentation" />
                 <data android:mimeType="application/vnd.oasis.opendocument.text" />
                 <data android:mimeType="application/vnd.oasis.opendocument.spreadsheet" />
                 <data android:mimeType="application/vnd.oasis.opendocument.presentation" />
@@ -173,7 +192,12 @@ MANIFEST.write_text(manifest)
 gradle=Path("app/build.gradle.kts")
 if gradle.exists():
     build=gradle.read_text()
+    if "org.apache.poi:poi-scratchpad:" not in build:
+        if "dependencies {" in build:
+            build=build.replace("dependencies {", "dependencies {\n    implementation(\"org.apache.poi:poi-scratchpad:5.4.1\")",1)
+        else:
+            build += "\ndependencies {\n    implementation(\"org.apache.poi:poi-scratchpad:5.4.1\")\n}\n"
     build=re.sub(r'versionCode\s*=\s*(\d+)',lambda m:'versionCode = '+str(int(m.group(1))+1),build,count=1)
-    build=re.sub(r'versionName\s*=\s*"[^"]+"','versionName = "0.8.0"',build,count=1)
+    build=re.sub(r'versionName\s*=\s*"[^"]+"','versionName = "0.9.0"',build,count=1)
     gradle.write_text(build)
 print("Universal document reader backend installed")

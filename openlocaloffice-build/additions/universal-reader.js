@@ -66,48 +66,190 @@ function imageView(){
  }catch(e){body.appendChild(E('p','fg-reader-empty',String(e.message||e)));}
  stage(bar,body);
 }
-function addLines(p,text,format){
- const code=/^(json|xml|yaml|yml|toml|log|sql|tsv|java|kt|kts|js|ts|css|scss|py|sh|ini|conf|svg|gradle|c|cpp|h|hpp|go|rs|php|gitignore)$/.test(format||'');
- if(code){p.appendChild(E('pre','fg-document-code',text));return;}
- let first=true;
- for(const line of String(text).replace(/\r\n/g,'\n').split('\n')){
-   let value=line.trim();
-   if(!value){p.appendChild(E('div','fg-paragraph-break'));continue;}
-   const md=/^(#{1,6})\s+(.+)/.exec(value);
-   const heading=md||/^(?:SLIDE|CHAPTER)\s+\d+/i.test(value)||/^\d+(?:\.\d+)*\s+\S/.test(value)&&value.length<100;
-   if(first&&format==='docx'&&value.length<120){p.appendChild(E('h1','fg-document-h1',value));}
-   else if(heading){p.appendChild(E('h2','fg-document-h2',md?md[2]:value));}
-   else if(format==='md'&&/^[-*+]\s+/.test(value)){p.appendChild(E('p','fg-document-bullet','• '+value.slice(2)));}
-   else p.appendChild(E('p','fg-document-p',line));
-   first=false;
+/* Accessible, paragraph-boundary text pagination: never slice mid-word. */
+let textCache=null;
+function readablePages(raw,format){
+ const input=String(raw||'').replace(/\r\n?/g,'\n');
+ if(textCache&&textCache.input===input&&textCache.format===format)return textCache.pages;
+ const limit=22000,pages=[],parts=input.split(/(\n{2,})/);
+ let current='';
+ function flush(){if(current){pages.push(current);current='';}}
+ for(const part of parts){
+   if(!part)continue;
+   if(part.length>limit){
+     flush();
+     let rem=part;
+     while(rem.length>limit){
+       let cut=rem.lastIndexOf(' ',limit);
+       if(cut<limit*.55)cut=rem.lastIndexOf('\n',limit);
+       if(cut<limit*.55)cut=limit;
+       pages.push(rem.slice(0,cut));rem=rem.slice(cut).replace(/^\s+/,'');
+     }
+     current=rem;continue;
+   }
+   if(current.length+part.length>limit)flush();
+   current+=part;
  }
+ flush();
+ if(!pages.length)pages.push('');
+ textCache={input,format,pages};return pages;
+}
+function addLines(host,raw,format){
+ const code=/^(json|xml|yaml|yml|toml|log|sql|tsv|java|kt|kts|js|ts|css|scss|py|sh|ini|conf|svg|gradle|c|cpp|h|hpp|go|rs|php|gitignore)$/.test(format||'');
+ if(code){host.appendChild(E('pre','fg-document-code',raw));return;}
+ const markdown=['md','markdown'].includes(format);
+ const lines=String(raw).replace(/\r\n?/g,'\n').split('\n');
+ let buffer=[],codeBlock=null;
+ function flush(){
+   if(!buffer.length)return;
+   const p=E('p','fg-document-p',buffer.join('\n'));
+   host.appendChild(p);buffer=[];
+ }
+ for(const line of lines){
+   const trimmed=line.trim();
+   if(markdown&&/^ {0,3}~~~/.test(line)){
+     flush();
+     if(codeBlock){host.appendChild(E('pre','fg-document-code',codeBlock.join('\n')));codeBlock=null;}
+     else codeBlock=[];
+     continue;
+   }
+   if(markdown&&line.trimStart().startsWith(String.fromCharCode(96,96,96))){
+     flush();
+     if(codeBlock){host.appendChild(E('pre','fg-document-code',codeBlock.join('\n')));codeBlock=null;}
+     else codeBlock=[];
+     continue;
+   }
+   if(codeBlock){codeBlock.push(line);continue;}
+   if(!trimmed){flush();continue;}
+   const md=markdown?/^(#{1,6})\s+(.+)$/.exec(trimmed):null;
+   if(md){flush();host.appendChild(E(md[1].length<=1?'h1':'h2',md[1].length<=1?'fg-document-h1':'fg-document-h2',md[2]));continue;}
+   if(markdown&&/^[-*+]\s+/.test(trimmed)){flush();host.appendChild(E('p','fg-document-bullet','• '+trimmed.slice(2)));continue;}
+   if(markdown&&/^\d+[.)]\s+/.test(trimmed)){flush();host.appendChild(E('p','fg-document-bullet',trimmed));continue;}
+   if(markdown&&/^>\s*/.test(trimmed)){flush();host.appendChild(E('blockquote','fg-docx-quote',trimmed.replace(/^>\s*/,'')));continue;}
+   // Plain-text line breaks remain in the same logical paragraph; separate
+   // only at blank lines, not at every wrapped or hard-broken source line.
+   buffer.push(line);
+ }
+ flush();
+ if(codeBlock)host.appendChild(E('pre','fg-document-code',codeBlock.join('\n')));
 }
 function textView(){
- const text=String(bridge()?.getText?.()||''),chunk=18000,pages=Math.max(1,Math.ceil(text.length/chunk));
- page=Math.min(page,pages-1);
- const desc=/^(pptx|odp)$/.test(doc.format)?'Slide text extraction · graphics/layout may differ':'Document reading view · offline';
- const [bar,tools]=toolbar(desc);
- controls(tools,pages,textView);zoomer(tools,textView);
+ const text=String(bridge()?.getText?.()||'');
+ const pages=readablePages(text,doc.format);
+ page=Math.min(page,pages.length-1);
+ const [bar,tools]=toolbar('Document view · original paragraph boundaries');
+ controls(tools,pages.length,textView);zoomer(tools,textView);
  const body=E('div','fg-reader-scroll'),p=paper('fg-document-sheet');
- addLines(p,text.slice(page*chunk,(page+1)*chunk),doc.format);
+ addLines(p,pages[page],doc.format);
  body.appendChild(p);stage(bar,body);
 }
-function docxEntries(){
- const count=doc.paragraphCount||0;
- try{return JSON.parse(bridge()?.getDocxRichWindow?.(page*150,Math.max(0,Math.min(150,count-page*150)))||'[]');}
- catch(_){return [];}
-}
+/* DOCX reads body blocks in order, keeps tables together, and scrolls without
+   manufacturing pages every 150 paragraphs. Windows are lazily appended. */
 function docx(){
- const pages=Math.max(1,Math.ceil((doc.paragraphCount||0)/150));page=Math.min(page,pages-1);
- const [bar,tools]=toolbar('Continuous reading layout · text-edit option');
- controls(tools,pages,docx);zoomer(tools,docx);
+ const b=bridge();
+ let count=0;
+ try{count=Number(b?.getDocxRichBlockCount?.()||0);}catch(_){}
+ const [bar,tools]=toolbar('Faithful document flow · original tables, headings and lists');
+ const body=E('div','fg-reader-scroll fg-docx-scroll');
+ const sheet=paper('fg-document-sheet fg-docx-sheet');
+ sheet.setAttribute('role','document');
+ sheet.setAttribute('aria-label',doc.name||'Word document');
+ const progress=E('span','fg-reader-counter','');
+ const message=E('div','fg-docx-message','');
+ const more=button('Load more ↓',()=>appendNext());
+ const foot=E('div','fg-docx-foot');
+ foot.append(progress,more);
+ body.append(sheet,foot);
+ let next=0,start=0,loading=false,lastSearch=0;
+ const chunk=24;
+ function updateProgress(){
+   const done=Math.min(count,next);
+   progress.textContent=count?done+' / '+count+' blocks':'Empty document';
+   more.disabled=next>=count;
+   more.classList.toggle('hidden',next>=count);
+ }
+ function appendNext(){
+   if(loading||next>=count)return;
+   loading=true;
+   try{
+     const rows=JSON.parse(b?.getDocxRichWindow?.(next,chunk)||'[]');
+     if(!Array.isArray(rows)||!rows.length)throw Error('Reader returned no document blocks.');
+     const f=document.createDocumentFragment();
+     for(const item of rows){
+       if(!Array.isArray(item)||item.length!==2)continue;
+       const n=E('div','fg-docx-flow-block');
+       n.dataset.index=String(item[0]);
+       // Only our native parser produces HTML, with escaped user text.
+       n.innerHTML=item[1];
+       f.appendChild(n);
+     }
+     sheet.appendChild(f);
+     next=Math.min(count,next+rows.length);
+     message.textContent=start?'Showing from document block '+(start+1):'';
+   }catch(e){
+     message.textContent='Cannot render this section: '+String(e.message||e);
+     more.disabled=true;
+   }finally{loading=false;updateProgress();}
+ }
+ function showFrom(index){
+   start=Math.max(0,Math.min(count-1,index));next=start;
+   sheet.replaceChildren();body.scrollTop=0;
+   appendNext();
+ }
+ const begin=button('↑ Start',()=>{lastSearch=0;showFrom(0);});
+ begin.title='Return to the beginning of the document';
+ tools.appendChild(begin);
+ tools.appendChild(button('A−',()=>{
+   zoom=Math.max(.78,Math.round((zoom-.1)*100)/100);
+   sheet.style.setProperty('--fg-size',String(zoom));
+ }));
+ tools.appendChild(button('A+',()=>{
+   zoom=Math.min(1.8,Math.round((zoom+.1)*100)/100);
+   sheet.style.setProperty('--fg-size',String(zoom));
+ }));
+ const searchInput=E('input','fg-reader-find');
+ searchInput.type='search';searchInput.placeholder='Find in document';
+ searchInput.setAttribute('aria-label','Find in entire Word document');
+ const findAction=()=>{
+   const term=searchInput.value.trim();
+   if(!term)return;
+   const target=Number(b?.findDocxBlock?.(term,lastSearch)??-1);
+   if(target<0){message.textContent='No matching text found';return;}
+   lastSearch=target+1;
+   let node=sheet.querySelector('[data-index="'+target+'"]');
+   if(!node){showFrom(target);node=sheet.querySelector('[data-index="'+target+'"]');}
+   if(node)node.scrollIntoView({block:'start',behavior:'auto'});
+   message.textContent='Match at block '+(target+1)+' of '+count;
+ };
+ searchInput.addEventListener('keydown',event=>{
+   if(event.key==='Enter'){event.preventDefault();findAction();}
+ });
+ tools.append(searchInput,button('Find',findAction));
  tools.appendChild(button('Edit text',()=>{
-   editing=true;original(doc);$('editor').classList.remove('fg-reader-host');
+   editing=true;original(doc);
+   $('editor').classList.remove('fg-reader-host');
    $('fgBackToReader').classList.remove('hidden');
  }));
- const body=E('div','fg-reader-scroll'),p=paper('fg-document-sheet');
- for(const [i,html] of docxEntries()){const block=E('div','fg-docx-rich-block');block.innerHTML=html;p.appendChild(block);}
- body.appendChild(p);stage(bar,body,true);
+ foot.prepend(message);
+ updateProgress();
+ if(count)appendNext();
+ else sheet.appendChild(E('p','fg-reader-empty','No Word body content was found.'));
+ let scheduled=false;
+ body.addEventListener('scroll',()=>{
+   if(scheduled)return;
+   scheduled=true;
+   requestAnimationFrame(()=>{
+     scheduled=false;
+     if(body.scrollTop+body.clientHeight>=body.scrollHeight-850)appendNext();
+   });
+ },{passive:true});
+ stage(bar,body);
+ // DOCX editing exists, but accidental Save in reader mode is not offered.
+ if($('saveBtn'))$('saveBtn').disabled=true;
+ if($('copyBtn'))$('copyBtn').disabled=true;
+ requestAnimationFrame(()=>{
+   if(body.scrollHeight<=body.clientHeight+350)appendNext();
+ });
 }
 function archive(){
  let entries=[];try{entries=JSON.parse(bridge()?.getArchiveEntries?.()||'[]');}catch(_){}
