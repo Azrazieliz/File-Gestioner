@@ -251,6 +251,14 @@ public final class BookArchive implements Closeable {
         InputStream stream=zip.getInputStream(entry);
         return new WebResourceResponse(mime(path),null,new BoundedStream(stream,MAX_IMAGE_BYTES));
     }
+    /** Only the requested image is decompressed. Used by native bookshelf covers. */
+    public InputStream coverStream(String name) throws IOException {
+        if(name==null||!isImage(name))throw new IOException("Not a cover image");
+        ZipEntry entry=zip.getEntry(name);
+        if(entry==null||entry.isDirectory()||entry.getSize()>128L*1024*1024)
+            throw new IOException("Cover is missing or exceeds decoding safety limit");
+        return zip.getInputStream(entry);
+    }
     public String archiveEntry(int index) throws Exception {
         if(index<0||index>=archiveImages.size())throw new IOException("Image index invalid");
         return assetUrl(archiveImages.get(index));
