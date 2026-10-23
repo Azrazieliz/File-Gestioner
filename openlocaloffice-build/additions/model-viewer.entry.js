@@ -77,9 +77,9 @@ function parse(format,buffer){
   const text=()=>decoder.decode(new Uint8Array(buffer));
   const m=manager();
   switch(format){
-    case 'glb':case 'gltf':
+    case 'glb':case 'gltf':case 'vrm':
       return new Promise((resolve,reject)=>{
-        new GLTFLoader(m).parse(format==='glb'?buffer:text(),'',
+        new GLTFLoader(m).parse((format==='glb'||format==='vrm')?buffer:text(),'',
           data=>resolve({root:data.scene||data.scenes?.[0],clips:data.animations||[]}),reject);
       });
     case 'obj':return Promise.resolve({root:new OBJLoader(m).parse(text()),clips:[]});
@@ -188,11 +188,11 @@ function open(doc,host,bridge){
   // Native authoring formats may be multi-gigabyte and are NOT meshes ready
   // for WebGL. Never load their binary bytes or claim to convert them on phone.
   if(doc.requiresConversion ||
-     ['blend','blend1','unity3d','assetbundle','zipmod'].includes(
+     ['blend','blend1','unity3d','assetbundle','zipmod','uasset','umap','pmx','pmd'].includes(
        String(doc.format||'').toLowerCase())){
     overlay.textContent='Native source file · conversion required\n'
       + 'Blender .blend: export an independent .glb preview with Blender 5.2.2.\n'
-      + 'Koikatsu cards / .unity3d / .zipmod: first export a legitimate FBX or GLB using the installed NoWorld + KKBP toolchain.\n'
+      + 'Koikatsu cards / .unity3d / .zipmod / PMX: first export a legitimate FBX or GLB using NoWorld + KKBP or MMD tools. Unreal .uasset/.umap require Unreal Editor export.\n'
       + 'The original project, cards, skeleton and mods remain unchanged.';
     info.textContent='Open the exported GLB here to inspect geometry, rig and animation and see NoWorld provenance. This phone viewer does not contain the Windows Blender/Koikatsu software.';
     return;
@@ -312,4 +312,4 @@ function open(doc,host,bridge){
   };
   load();
 }
-window.FileGestionerModelViewer={open,dispose:reset,formats:['glb','gltf','obj','fbx','stl','ply','dae','3mf','3ds','amf','usdz','usda','usdc','blend','blend1','unity3d','assetbundle','zipmod']};
+window.FileGestionerModelViewer={open,dispose:reset,formats:['glb','gltf','obj','fbx','stl','ply','dae','3mf','3ds','amf','usdz','usda','usdc','vrm','blend','blend1','unity3d','assetbundle','zipmod','uasset','umap','pmx','pmd']};
