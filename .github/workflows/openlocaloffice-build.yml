@@ -93,6 +93,8 @@ jobs:
           python3 ../hotfixes/apply-premium-book-ui.py
           python3 ../hotfixes/apply-saf-recent-permissions.py
           python3 ../hotfixes/apply-image-zip-reader-polish.py
+          python3 ../hotfixes/apply-premium-library-native.py
+          python3 ../hotfixes/apply-premium-v13-reader.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -127,6 +129,12 @@ jobs:
           grep -Fq 'OS' app/src/main/java/com/openlocal/office/core/BookArchive.java || true
           grep -Fq 'Comic ZIP' ../hotfixes/test-archive-saf-regression.cjs
           node ../hotfixes/test-archive-saf-regression.cjs
+          node --check app/src/main/assets/premium-library.js
+          node ../hotfixes/test-premium-v13.cjs
+          grep -Fq 'new SeekableZip(handle)' app/src/main/java/com/openlocal/office/core/BookArchive.java
+          grep -Fq 'premium-library.js' app/src/main/assets/index.html
+          grep -Fq 'ReaderLibrary.Listing' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'KoikatsuCards.isCharacterCard' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq '0.12.1' app/src/main/assets/style.css
           grep -Fq 'fg-book-mode' app/src/main/assets/style.css
           grep -Fq 'epub-reader.js' app/src/main/assets/index.html
