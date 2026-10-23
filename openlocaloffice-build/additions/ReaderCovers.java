@@ -47,7 +47,12 @@ public final class ReaderCovers {
                 temp.delete();
             }
             return new FileInputStream(cached);
-        }catch(InterruptedException error){
+        }catch(IOException e){
+            // Missing art must not crash the library, but never silently hide
+            // why all covers failed (e.g. an unsupported EPUB XML parser).
+            android.util.Log.w("FG_COVERS","Thumbnail extraction failed: "+name,e);
+            throw e;
+        }        }catch(InterruptedException error){
             Thread.currentThread().interrupt();
             throw new IOException("Cover loading interrupted",error);
         }finally {
@@ -85,11 +90,16 @@ public final class ReaderCovers {
         if(isArchive(name)){
             try(BookArchive book=new BookArchive(ctx,uri,lower.endsWith(".epub"))){
                 if(book.imageCount()==0)return null;
+                // Comics: the FIRST page is the cover, never an arbitrary later
+                // filename containing "title" or "front". EPUB: prefer its
+                // explicitly named cover image when available.
                 String candidate=book.imageName(0);
-                for(int i=0;i<Math.min(book.imageCount(),25);i++){
-                    String n=book.imageName(i).toLowerCase(Locale.ROOT);
-                    if(n.contains("cover")||n.contains("front")||n.contains("title")){
-                        candidate=book.imageName(i);break;
+                if(lower.endsWith(".epub")){
+                    for(int i=0;i<Math.min(book.imageCount(),40);i++){
+                        String n=book.imageName(i).toLowerCase(Locale.ROOT);
+                        if(n.matches(".*(?:^|[/_-])(?:cover|frontcover)(?:[_.-]|$).*")){
+                            candidate=book.imageName(i);break;
+                        }
                     }
                 }
                 try(InputStream bounds=book.coverStream(candidate)){
