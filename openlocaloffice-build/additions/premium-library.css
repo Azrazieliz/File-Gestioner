@@ -1,0 +1,136 @@
+/* File Gestioner Studio · genuine visual-first personal reader library.
+   Designed around original cover art, not developer filename cards. */
+.fg-lib-hidden{display:none!important}
+.fg-library-root{position:fixed;inset:0;z-index:105;display:flex;flex-direction:column;
+ background:#0e1119;color:#f1f2f7;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;
+ -webkit-font-smoothing:antialiased}
+.fg-lib-header{display:flex;align-items:center;justify-content:space-between;
+ padding:14px clamp(17px,4vw,35px);
+ padding-top:calc(12px + env(safe-area-inset-top));
+ min-height:72px;flex:0 0 auto;gap:16px;border-bottom:1px solid #ffffff10;
+ background:linear-gradient(140deg,#161c2b,#10131c)}
+.fg-lib-brand{display:flex;align-items:center;gap:12px;min-width:0}
+.fg-lib-monogram{display:flex;align-items:center;justify-content:center;width:43px;height:43px;
+ flex:0 0 43px;border-radius:13px;font-weight:900;font-size:16px;letter-spacing:-.08em;
+ color:#fbfcff;background:linear-gradient(135deg,#8a92ff,#4c64b1);
+ box-shadow:0 5px 18px #7884fd35}
+.fg-lib-title-group{display:flex;flex-direction:column;gap:2px;white-space:nowrap}
+.fg-lib-brand-title{font-size:18px;line-height:1.2;letter-spacing:-.045em;
+ font-weight:780;color:#f4f6ff}
+.fg-lib-brand-subtitle{font-size:9px;letter-spacing:.15em;color:#949caf;font-weight:700}
+.fg-lib-actions{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.fg-lib-actions button,.fg-lib-large-action{font-size:12px;font-weight:700;
+ border-radius:11px;min-height:37px;padding:8px 13px;letter-spacing:-.012em}
+.fg-lib-primary,.fg-lib-large-action{color:white!important;border:1px solid #8292ff99!important;
+ background:linear-gradient(135deg,#7684ff,#596ee2)!important;box-shadow:0 4px 17px #657bde30}
+.fg-lib-secondary{color:#c8cfe3!important;background:#22293b!important;
+ border:1px solid #384055!important}
+.fg-lib-actions button:active,.fg-lib-large-action:active{transform:scale(.98)}
+.fg-lib-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;
+ padding:0 clamp(17px,4vw,40px) 70px;overscroll-behavior:contain;
+ scrollbar-color:#48536d transparent}
+.fg-lib-welcome{padding:clamp(38px,8vh,90px) 8px 17px;max-width:700px}
+.fg-lib-kicker{font-size:11px;letter-spacing:.19em;color:#9599ff;font-weight:700;margin:0 0 18px}
+.fg-lib-hero{font-size:clamp(29px,7vw,58px);font-weight:800;color:#f4f5ff;
+ letter-spacing:-.055em;line-height:1.08;margin:0 0 18px;text-wrap:balance}
+.fg-lib-subtitle{font-size:clamp(13px,3.6vw,16px);font-weight:440;
+ color:#a0a8bc;line-height:1.7;max-width:510px;margin:0}
+.fg-lib-toolbar{display:flex;align-items:center;gap:12px;padding:24px 0 15px;
+ min-height:74px;border-bottom:1px solid #ffffff13}
+.fg-lib-nav-back{font-size:32px;min-width:37px;min-height:42px;
+ background:none;border:0;color:#b8bed9}
+.fg-lib-head-info{display:flex;flex-direction:column;gap:4px;min-width:0;
+ flex:1 1 auto}
+.fg-lib-collection-title{font-weight:760;letter-spacing:-.045em;
+ font-size:clamp(22px,4.6vw,32px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fg-lib-count{font-size:11px;color:#8790a6}
+.fg-lib-search{appearance:none;background:#202634;color:#f4f5ff;border:1px solid #30394b;
+ border-radius:13px;min-height:41px;padding:10px 14px;font:500 13px system-ui;
+ width:clamp(120px,26vw,310px);outline:none}
+.fg-lib-search:focus{border-color:#7a8df5;box-shadow:0 0 0 2px #7a8df540}
+.fg-lib-search::placeholder{color:#8994aa}
+.fg-lib-icon{min-width:41px;min-height:41px;border-radius:12px;background:#202634;
+ border:1px solid #343e54;color:#d7ddf4;font-size:22px}
+.fg-lib-filters{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:19px 0 25px;
+ scrollbar-width:none}
+.fg-lib-filters::-webkit-scrollbar{display:none}
+.fg-lib-filter{border:1px solid #354058;background:#1d2432;color:#bfc8dd;
+ font:650 11px system-ui;letter-spacing:.01em;border-radius:22px;
+ padding:9px 16px;min-height:35px;white-space:nowrap}
+.fg-lib-selected{background:#7082f8;color:#fff;border-color:#8494fb;
+ box-shadow:0 4px 18px #6d80ff33}
+.fg-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(138px,1fr));
+ gap:27px 15px;padding:4px 0 50px}
+.fg-lib-tile{min-width:0;overflow:visible;cursor:pointer;outline:none}
+.fg-lib-tile:focus-visible .fg-lib-cover{outline:2px solid #9ca9ff;outline-offset:3px}
+.fg-lib-cover{position:relative;width:100%;aspect-ratio:2/3;
+ border-radius:13px;overflow:hidden;background:
+ radial-gradient(circle at 35% 20%,hsla(var(--fg-hue),55%,62%,.26),transparent 65%),
+ linear-gradient(145deg,#242d41,#141a26 78%);
+ border:1px solid #ffffff17;box-shadow:0 9px 24px #0005;
+ transition:transform .2s,box-shadow .2s}
+.fg-lib-tile:active .fg-lib-cover{transform:scale(.985)}
+.fg-lib-fallback{display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+ position:absolute;inset:0;padding:21px 13px 40px;gap:13px;pointer-events:none}
+.fg-lib-fallback-glyph{display:flex;align-items:center;justify-content:center;
+ color:hsla(var(--fg-hue),65%,83%,.9);font-size:44px;font-weight:300;
+ text-shadow:0 4px 15px #0004;margin:auto 0}
+.fg-lib-fallback-title{font-size:14px;line-height:1.27;font-weight:790;
+ letter-spacing:-.028em;display:-webkit-box;-webkit-line-clamp:4;
+ -webkit-box-orient:vertical;overflow:hidden;word-break:break-word;color:#f1f2fb;
+ text-align:center;max-height:77px}
+.fg-lib-cover-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+ opacity:0;transition:opacity .26s;display:block}
+.fg-lib-has-image .fg-lib-cover-image{opacity:1}
+.fg-lib-type{position:absolute;right:8px;bottom:9px;display:inline-flex;
+ background:#0d111cca;backdrop-filter:blur(12px);color:#e4e9f6;
+ border:1px solid #ffffff29;border-radius:6px;padding:4px 7px;
+ font:750 8px/1.2 system-ui;letter-spacing:.085em}
+.fg-lib-tile-meta{padding:11px 2px 0;min-width:0}
+.fg-lib-item-title{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+ overflow:hidden;word-break:break-word;color:#f1f1f8;
+ font-size:12px;font-weight:700;line-height:1.42;min-height:34px}
+.fg-lib-item-detail{display:block;margin-top:5px;font-size:11px;color:#8893a8}
+.fg-lib-list{grid-template-columns:1fr;gap:7px;max-width:960px}
+.fg-lib-list .fg-lib-tile{display:flex;align-items:center;gap:13px;padding:9px;
+ border:1px solid #30394c;border-radius:12px;background:#181e2a}
+.fg-lib-list .fg-lib-cover{width:61px;flex:0 0 61px;border-radius:6px;aspect-ratio:2/3;
+ box-shadow:none}
+.fg-lib-list .fg-lib-fallback{padding:4px}
+.fg-lib-list .fg-lib-fallback-glyph{font-size:20px}
+.fg-lib-list .fg-lib-fallback-title,.fg-lib-list .fg-lib-type{display:none}
+.fg-lib-list .fg-lib-tile-meta{flex:1;padding:0}
+.fg-lib-list .fg-lib-item-title{min-height:0;font-size:14px}
+.fg-lib-empty{display:flex;flex-direction:column;align-items:center;
+ justify-content:center;text-align:center;gap:11px;min-height:38vh;padding:27px 16px}
+.fg-lib-empty-icon{font-size:44px;color:#9ca9ff;font-weight:300}
+.fg-lib-empty strong{font-size:20px;letter-spacing:-.025em}
+.fg-lib-empty p{font-size:13px;color:#9da7ba;line-height:1.65;max-width:330px;margin:0 0 10px}
+.fg-lib-loading{font-size:13px;color:#a9b6d4;text-align:center;padding:48px 12px}
+.fg-lib-footer{text-align:center;font:700 9px system-ui;color:#626d81;
+ letter-spacing:.12em;padding:26px 10px;opacity:.7}
+.fg-lib-top-link{padding:7px 11px;font-size:12px;min-height:35px;
+ background:#232b3d;border:1px solid #38445d;border-radius:10px;color:#dce3f5}
+@media(min-width:700px){
+ .fg-lib-grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:34px 22px}
+ .fg-lib-item-title{font-size:14px;min-height:40px}
+ .fg-lib-body{max-width:1600px;width:100%;margin:0 auto}
+}
+@media(max-width:510px){
+ .fg-lib-header{padding:12px 15px;min-height:67px}
+ .fg-lib-brand{gap:9px}
+ .fg-lib-monogram{height:38px;width:38px;flex-basis:38px;border-radius:11px;font-size:14px}
+ .fg-lib-brand-title{font-size:16px}
+ .fg-lib-brand-subtitle{font-size:8px}
+ .fg-lib-actions{gap:5px}
+ .fg-lib-actions button{padding:7px 9px;min-height:35px;font-size:11px}
+ .fg-lib-body{padding:0 15px 60px}
+ .fg-lib-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:23px 12px}
+ .fg-lib-toolbar{gap:8px;padding:17px 0 9px}
+ .fg-lib-nav-back{min-width:26px;font-size:27px}
+ .fg-lib-collection-title{font-size:22px}
+ .fg-lib-search{width:115px;min-height:37px;padding:7px 9px;font-size:11px}
+ .fg-lib-icon{min-height:36px;min-width:35px}
+ .fg-lib-filters{padding:17px 0 20px;gap:7px}
+ .fg-lib-filter{padding:8px 12px;font-size:10px;min-height:32px}
+}
