@@ -54,6 +54,7 @@ function chapterFragment(html,base){
       const figure=el('figure','fg-book-illustration');
       const image=el('img','fg-book-cover-image');
       image.src=url;image.loading='lazy';image.decoding='async';
+      image.addEventListener('load',()=>window.AndroidBridge?.readerDiagnostic?.('BOOK_IMAGE_LOADED'));
       image.alt=embedded?.getAttribute('aria-label')||'Book illustration';
       figure.appendChild(image);
       return figure;
@@ -74,6 +75,7 @@ function chapterFragment(html,base){
       const url=imageRef(node.getAttribute('src')||node.getAttribute('data-src'));
       if(!url)return document.createDocumentFragment();
       target.src=url;
+      target.addEventListener('load',()=>window.AndroidBridge?.readerDiagnostic?.('BOOK_IMAGE_LOADED'));
       target.alt=node.getAttribute('alt')||'';
       target.loading='lazy';target.decoding='async';
       target.referrerPolicy='no-referrer';target.draggable=false;
