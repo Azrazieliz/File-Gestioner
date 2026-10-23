@@ -49,6 +49,12 @@ function pdf(){
  const cells=[],loaded=new Map(),queued=new Set();
  let metrics=[],observer=null,disposed=false,renderScheduled=false,scrollFrame=0;
  let readingPage=0,scale=1,qualityTimer=0,pinch=null;
+ const zoomKey='fg.pdf.zoom.v1.'+String(doc.name||'');
+ let savedZoom=1;
+ try {
+   const v=Number(localStorage.getItem(zoomKey));
+   if(Number.isFinite(v)&&v>=.65&&v<=4)savedZoom=v;
+ }catch(_){} 
  try{metrics=JSON.parse(b?.getPdfPageMetrics?.()||'[]');}
  catch(_){metrics=[];}
  if(!Array.isArray(metrics))metrics=[];
@@ -166,7 +172,10 @@ function pdf(){
    body.scrollLeft=Math.max(0,anchorX*scale-fx);
    body.scrollTop=Math.max(0,anchorY*scale-fy);
    updatePage();
-   if(!interactive)queueSharpen();
+   if(!interactive){
+     try{localStorage.setItem(zoomKey,String(scale));}catch(_){}
+     queueSharpen();
+   }
  }
  for(let i=0;i<count;i++){
    const data=metrics[i],w=Number(data?.[0]),h=Number(data?.[1]);
@@ -181,6 +190,7 @@ function pdf(){
  if(!count)pages.appendChild(E('p','fg-reader-empty','This PDF is empty.'));
  stage(bar,body);
  document.body.classList.add('fg-pdf-reading');
+ if(Math.abs(savedZoom-1)>.005)changeZoom(savedZoom);
  // Gesture scale never invokes the native renderer inside touchmove.
  const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
  const focal=(a,b)=>{
@@ -204,7 +214,11 @@ function pdf(){
  let lastTouchTime=0,lastTouchPoint=null,suppressTap=false;
  const onTouchEnd=e=>{
    if(pinch){
-     if(e.touches.length<2){suppressTap=pinch.moved;pinch=null;queueSharpen();}
+     if(e.touches.length<2){
+       suppressTap=pinch.moved;pinch=null;
+       try{localStorage.setItem(zoomKey,String(scale));}catch(_){}
+       queueSharpen();
+     }
      return;
    }
    if(e.touches.length||e.changedTouches.length!==1)return;
@@ -264,7 +278,8 @@ function imageView(){
  const body=E('div','fg-reader-scroll fg-image-surface'),img=E('img','fg-display-image');
  const formats={jpg:'jpeg',jpeg:'jpeg',png:'png',webp:'webp',gif:'gif',avif:'avif',bmp:'bmp',heic:'heic',heif:'heif'};
  try{
-  if(!assetUrl)assetUrl=URL.createObjectURL(new Blob([localBytes()],{type:'image/'+(formats[doc.format]||'jpeg')}));
+  if(!assetUrl)assetUrl=doc.streamed&&doc.url?doc.url:
+    URL.createObjectURL(new Blob([localBytes()],{type:'image/'+(formats[doc.format]||'jpeg')}));
   img.src=assetUrl;img.alt=doc.name;img.style.width='100%';
   img.onerror=()=>{body.replaceChildren(E('p','fg-reader-empty','This image codec is unsupported by the installed Android WebView.'));};
   body.appendChild(img);
@@ -479,13 +494,14 @@ function archive(){
      return;
    }
    try{
-     const data=bridge()?.getArchiveEntryBase64?.(entry.name)||'';
-     if(!data)throw Error('Entry exceeds preview limit or is not readable.');
+     const data=entry.streamed?'':(bridge()?.getArchiveEntryBase64?.(entry.name)||'');
+     if(!data&&!entry.streamed)throw Error('This archive entry cannot be displayed inline.');
      if(/\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(entry.name)){
        const ext=entry.name.split('.').pop().toLowerCase();
        const im=E('img','fg-archive-img');im.alt=entry.name;
        im.loading='lazy';
-       im.src='data:image/'+(ext==='jpg'?'jpeg':ext)+';base64,'+data;
+       im.src=entry.streamed?(bridge()?.getArchiveImageUrl?.(entry.name)||''):
+         'data:image/'+(ext==='jpg'?'jpeg':ext)+';base64,'+data;
        dest.appendChild(im);
      }else{
        dest.appendChild(E('pre','fg-document-code',
@@ -586,6 +602,53 @@ function archive(){
    body.appendChild(list);stage(bar,body);
  }
 }
+/* Multi-gigabyte plain text is streamed in small forward windows. The UI
+   keeps only a bounded number of text nodes to avoid memory exhaustion. */
+function streamText(){
+ const [bar,tools]=toolbar('Continuous text');
+ const body=E('div','fg-reader-scroll fg-text-scroll');
+ const sheet=paper('fg-document-sheet fg-continuous-text');
+ const spacer=E('div','fg-streamed-spacer');
+ const stream=E('div','fg-streamed-content');
+ sheet.append(spacer,stream);body.appendChild(sheet);
+ const status=E('span','fg-reader-counter','Reading');
+ tools.append(status);
+ let done=false,pending=false,removedHeight=0,chunks=0;
+ function append(){
+   if(done||pending)return;
+   pending=true;
+   try {
+     const response=JSON.parse(bridge()?.nextTextChunk?.(65536)||'{}');
+     if(response.text){
+       const item=E('pre','fg-document-code fg-raw-text',response.text);
+       item.style.whiteSpace='pre-wrap';item.style.wordBreak='break-word';
+       stream.appendChild(item);chunks++;
+     }
+     if(response.end||!response.text)done=true;
+     if(chunks>100){
+       const old=Array.from(stream.children).slice(0,25);
+       removedHeight+=old.reduce((n,node)=>n+node.offsetHeight,0);
+       old.forEach(n=>n.remove());
+       chunks-=old.length;
+       spacer.style.height=removedHeight+'px';
+     }
+     if(done)status.textContent='End';
+   }catch(error){done=true;status.textContent='Read error';}
+   finally{pending=false;}
+ }
+ function fill(){
+   if(done)return;
+   for(let i=0;i<3;i++)append();
+   if(body.scrollHeight<=body.clientHeight+500&&!done)
+     requestAnimationFrame(fill);
+ }
+ stage(bar,body);
+ body.addEventListener('scroll',()=>{
+   if(!done&&body.scrollTop+body.clientHeight>body.scrollHeight-1000)
+     requestAnimationFrame(fill);
+ },{passive:true});
+ requestAnimationFrame(fill);
+}
 function binary(){
  const [bar]=toolbar('Unknown or legacy binary document · inspection only');
  const body=E('div','fg-reader-scroll'),p=paper('fg-document-sheet');
@@ -615,6 +678,7 @@ window.loadDocument=function(d){
  if(d.type==='pdf')pdf();
  else if(d.type==='image')imageView();
  else if(d.type==='reader')textView();
+ else if(d.type==='streamText')streamText();
  else if(d.type==='archive')archive();
  else if(d.type==='binary')binary();
  else if(d.type==='docx')docx();

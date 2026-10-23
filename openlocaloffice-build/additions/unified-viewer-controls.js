@@ -71,6 +71,13 @@ function createController(doc,config){
     b.addEventListener('click',act);return b;
   };
   let scale=1,disposed=false,pinch=null,lastTap=0,lastPosition=null;
+  const settingsKey='fg.view.scale.v1.'+
+    String(doc.type||'reader')+':'+String(doc.name||'');
+  let savedScale=1;
+  try {
+    const value=Number(localStorage.getItem(settingsKey));
+    if(Number.isFinite(value)&&value>=minScale&&value<=maxScale)savedScale=value;
+  }catch(_){} 
   const applyScale=(value)=>{
     if(mode==='reflow')target.style.setProperty('--fg-size',String(value));
     else if(mode==='width'||mode==='image'){
@@ -97,6 +104,7 @@ function createController(doc,config){
     scale=value;
     applyScale(value);
     label.textContent=Math.round(value*100)+'%';
+    try{localStorage.setItem(settingsKey,String(scale));}catch(_){} 
     scroller.scrollLeft=Math.max(0,anchorX*value-fx);
     scroller.scrollTop=Math.max(0,anchorY*value-fy);
   };
@@ -168,6 +176,7 @@ function createController(doc,config){
     scroller.classList.remove('fg-unified-scroll','fg-unified-image-scroll');
     dock.remove();
   };
+  if(Math.abs(savedScale-1)>.005)requestAnimationFrame(()=>zoomTo(savedScale));
   return {doc,scroller,target,kind,zoomTo,dispose:cleanup};
 }
 function scan(doc,nonce){
