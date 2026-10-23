@@ -7,14 +7,15 @@ class Element {
   this.style={setProperty:(k,v)=>{this.style[k]=v;}};this.className='';
   this.classList={add:()=>{},remove:()=>{},toggle:()=>{}};
   this.textContent='';this.clientWidth=720;this.clientHeight=1280;
-  this.scrollTop=0;this.attributes={};this.isConnected=true;}
+  this.scrollTop=0;this.scrollLeft=0;this.listeners={};this.attributes={};this.isConnected=true;}
  append(...nodes){this.children.push(...nodes);}
  appendChild(node){this.children.push(node);return node;}
  prepend(node){this.children.unshift(node);}
  replaceChildren(...nodes){this.children=[...nodes];}
  setAttribute(k,v){this.attributes[k]=v;}
  removeAttribute(k){delete this.attributes[k];}
- addEventListener(){}
+ addEventListener(name,fn){(this.listeners[name]??=[]).push(fn);}
+ emit(name,event){for(const fn of this.listeners[name]||[])fn(event||{});}
  getBoundingClientRect(){return {top:0,bottom:900,height:900};}
  querySelector(){return null;}
  querySelectorAll(){return [];}
@@ -25,6 +26,7 @@ for(const id of ['editor','sheetBar','spreadsheetTools','textFormat','notice',
                  'saveBtn','copyBtn'])
  ids.set(id,new Element(id));
 const document={
+ body:new Element('body'),
  createElement:tag=>new Element(tag),
  createDocumentFragment:()=>new Element('fragment'),
  getElementById:id=>ids.get(id)||null,
@@ -72,6 +74,27 @@ assert(!buttons().includes('‹')&&!buttons().includes('›'),
        'PDF must not have previous/next slide navigation');
 flush();
 assert(calls.length<=2,'Initial PDF load may only rasterize visible-near pages');
+const stack=visit(root,x=>x.className==='fg-pdf-stack')[0];
+const pdfBody=visit(root,x=>x.className.includes('fg-pdf-scroll'))[0];
+assert(stack&&pdfBody,'The reader must provide a zoomable scroll surface');
+const plus=visit(root,x=>x.tagName==='button'&&x.textContent==='+')[0];
+const fit=visit(root,x=>x.tagName==='button'&&x.textContent==='Fit')[0];
+assert(plus?.onclick&&fit?.onclick,'Zoom controls must be functional');
+plus.onclick();
+assert.strictEqual(stack.style.width,'125%','Plus must zoom actual page width, not just a label');
+assert(pdfBody.scrollLeft>=0,'Zoom cannot create negative horizontal scroll position');
+fit.onclick();
+assert.strictEqual(stack.style.width,'100%','Fit must restore screen width');
+const finger=(x,y)=>({clientX:x,clientY:y});
+pdfBody.emit('touchstart',{touches:[finger(100,200),finger(200,200)]});
+let prevented=false;
+pdfBody.emit('touchmove',{touches:[finger(65,200),finger(235,200)],
+ preventDefault:()=>{prevented=true;}});
+assert(prevented,'Two-finger gesture must block native scrolling while actively pinching');
+assert(parseInt(stack.style.width)>100,'Pinch apart must increase actual page size');
+pdfBody.emit('touchend',{touches:[],changedTouches:[]});
+assert(pdfBody.listeners.wheel?.length,'Ctrl+wheel zoom is supported');
+
 assert(visit(root,x=>x.className.includes('fg-pdf-scroll')).length===1,
        'PDF needs a single vertical scroll element');
 currentText=('Paragraph one.\n\nParagraph two.\n\n').repeat(350);
