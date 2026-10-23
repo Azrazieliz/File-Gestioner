@@ -234,8 +234,8 @@ jobs:
             sleep 3
             adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+' || { echo "File Gestioner failed to launch"; exit 1; }
             mkdir -p screenshots
-            adb shell screencap -p /sdcard/fg-reader-home.png
-            adb pull /sdcard/fg-reader-home.png screenshots/fg-reader-home.png
+            adb exec-out screencap -p > screenshots/fg-reader-home.png
+            test -s screenshots/fg-reader-home.png
             adb logcat -b crash -d | tee screenshots/crash-log.txt
             if grep -q 'FATAL EXCEPTION' screenshots/crash-log.txt; then exit 1; fi
 
