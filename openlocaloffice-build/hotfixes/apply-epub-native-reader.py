@@ -48,6 +48,8 @@ source=source.replace(anchor,'''                // EPUB is a genuine spine-based
                 if ("epub".equals(quickType)) {
                     closeBook();
                     BookArchive candidate=new BookArchive(this,uri,true);
+                    android.util.Log.i("FG_BOOK","EPUB_READY chapters="+
+                        candidate.chapterCount()+" illustrations="+candidate.imageCount());
                     bookArchive=candidate;
                     xlsx=null;csv=null;docx=null;sdocx=null;
                     textDocument=null;rawDocument=null;
