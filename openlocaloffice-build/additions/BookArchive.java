@@ -27,7 +27,8 @@ public final class BookArchive implements Closeable {
     private final Uri uri;
     private final ParcelFileDescriptor descriptor;
     private final File temporary;
-    private final ZipFile zip;
+    private final SeekableZip zip;
+    private final ParcelFileDescriptor tempDescriptor;
     private final String token;
     private final ArrayList<Chapter> chapters = new ArrayList<>();
     private final LinkedHashMap<String,String> titles = new LinkedHashMap<>();
@@ -51,7 +52,8 @@ public final class BookArchive implements Closeable {
         token=UUID.randomUUID().toString();
         ParcelFileDescriptor handle=null;
         File temp=null;
-        ZipFile opened=null;
+        SeekableZip opened=null;
+        ParcelFileDescriptor spoolHandle=null;
         try {
             handle=context.getContentResolver().openFileDescriptor(uri,"r");
             if(handle==null)throw new IOException("Cannot read this document provider");
@@ -64,55 +66,39 @@ public final class BookArchive implements Closeable {
                 throw new IOException("The cloud document is incomplete ("+
                     physical+" / "+advertised+" bytes). Complete Round Sync download first.");
             }
-            boolean seekable=false;
             try {
-                Os.lseek(handle.getFileDescriptor(),0L,OsConstants.SEEK_CUR);
-                seekable=true;
-            } catch(Exception unsupported) {
-                // Providers offering only pipes need one bounded-disk spool.
-            }
-            try {
-                // Seekable providers: ZipFile opens the original SAF descriptor
-                // via /proc/self/fd. No copy, even for multi-gigabyte books.
-                opened=new ZipFile("/proc/self/fd/"+handle.getFd());
-            } catch(Exception unsupported) {
-                if(seekable){
-                    // If the FD is seekable, copying the entire already-staged
-                    // Round Sync/TeraBox file will not repair an incomplete ZIP.
-                    // Avoid Asterion-style redundant transfer work.
-                    throw new IOException("This ZIP is incomplete, damaged, or cannot be indexed directly. "+
-                        "Check that Round Sync finished downloading it.",unsupported);
-                }
-                // True streaming/pipe provider: a single disk spool is needed
-                // for ZIP central-directory random access. Never heap-copy.
-                // never into a Java byte[]. Requires device cache free space.
+                // Read ZIP central directory directly from the SAF descriptor.
+                // Unlike ZipFile("/proc/self/fd/NN"), this does not reopen
+                // provider-owned FDs and does not download/copy them a second time.
+                opened=new SeekableZip(handle);
+            } catch(IOException indexError) {
+                boolean seekable;
+                try{Os.lseek(handle.getFileDescriptor(),0L,OsConstants.SEEK_CUR);seekable=true;}
+                catch(Exception notSeekable){seekable=false;}
+                if(seekable)throw new IOException(
+                    "Unable to read ZIP index directly. The archive may be incomplete or damaged.",indexError);
+                // Only pipe-only sources require ONE persistent disk spool.
                 File dir=new File(context.getCacheDir(),"reading");
-                if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create offline reading cache");
+                if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create temporary reading cache");
                 temp=File.createTempFile("book-",".zip",dir);
                 long copied=0L;
                 try(InputStream input=context.getContentResolver().openInputStream(uri);
                     OutputStream output=new BufferedOutputStream(new FileOutputStream(temp),128*1024)){
-                    if(input==null)throw new IOException("The document provider could not stream this book");
-                    byte[] buffer=new byte[128*1024];
-                    int n;
+                    if(input==null)throw new IOException("The cloud provider has no readable stream");
+                    byte[] buffer=new byte[128*1024];int n;
                     while((n=input.read(buffer))!=-1){
-                        output.write(buffer,0,n);
-                        copied+=n;
+                        output.write(buffer,0,n);copied+=n;
                     }
-                }catch(IOException e){
-                    temp.delete();
-                    throw new IOException("The provider is not seekable and the book cannot be cached. Check available device storage.",e);
                 }
-                // Catch truncated provider transfer before indexing the ZIP.
-                if(advertised>0&&copied!=advertised){
-                    throw new IOException("Cloud transfer incomplete: copied "+
-                        copied+" / "+advertised+" bytes.");
-                }
-                opened=new ZipFile(temp);
+                if(advertised>0&&copied!=advertised)
+                    throw new IOException("Cloud transfer incomplete: received "+copied+" / "+advertised+" bytes.");
+                spoolHandle=ParcelFileDescriptor.open(temp,ParcelFileDescriptor.MODE_READ_ONLY);
+                opened=new SeekableZip(spoolHandle);
             }
             zip=opened;
             descriptor=handle;
             temporary=temp;
+            tempDescriptor=spoolHandle;
             Enumeration<? extends ZipEntry> entries=zip.entries();
             int index=0;
             while(entries.hasMoreElements()){
@@ -131,6 +117,7 @@ public final class BookArchive implements Closeable {
         }catch(Exception failure){
             if(opened!=null)try{opened.close();}catch(IOException ignored){}
             if(handle!=null)try{handle.close();}catch(IOException ignored){}
+            if(spoolHandle!=null)try{spoolHandle.close();}catch(IOException ignored){}
             if(temp!=null)temp.delete();
             throw failure;
         }
@@ -263,6 +250,14 @@ public final class BookArchive implements Closeable {
         if(entry.getSize()>MAX_IMAGE_BYTES)throw new IOException("A single book image exceeds the 128 MiB decoding safety limit");
         InputStream stream=zip.getInputStream(entry);
         return new WebResourceResponse(mime(path),null,new BoundedStream(stream,MAX_IMAGE_BYTES));
+    }
+    /** Only the requested image is decompressed. Used by native bookshelf covers. */
+    public InputStream coverStream(String name) throws IOException {
+        if(name==null||!isImage(name))throw new IOException("Not a cover image");
+        ZipEntry entry=zip.getEntry(name);
+        if(entry==null||entry.isDirectory()||entry.getSize()>128L*1024*1024)
+            throw new IOException("Cover is missing or exceeds decoding safety limit");
+        return zip.getInputStream(entry);
     }
     public String archiveEntry(int index) throws Exception {
         if(index<0||index>=archiveImages.size())throw new IOException("Image index invalid");
@@ -402,6 +397,7 @@ public final class BookArchive implements Closeable {
     }
     @Override public void close() throws IOException {
         zip.close();descriptor.close();
+        if(tempDescriptor!=null)tempDescriptor.close();
         if(temporary!=null)temporary.delete();
     }
     private static final class BoundedStream extends FilterInputStream{

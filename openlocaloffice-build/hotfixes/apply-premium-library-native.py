@@ -1,0 +1,166 @@
+from pathlib import Path
+
+main=Path("app/src/main/java/com/openlocal/office/MainActivity.java")
+s=main.read_text()
+def once(old,new):
+    global s
+    assert s.count(old)==1,("Expected one anchor:",old[:80],s.count(old))
+    s=s.replace(old,new,1)
+once('    private static final int REQ_SAVE_COPY = 1002;',
+'''    private static final int REQ_SAVE_COPY = 1002;
+    private static final int REQ_LIBRARY_TREE = 2010;
+    private static final int REQ_KOIKATSU_PREVIEW = 2011;''')
+once('    private String imageStreamToken;', '''
+    private String imageStreamToken;
+    private volatile Uri libraryTree;
+    private final java.util.concurrent.ConcurrentHashMap<String,LibraryCover> libraryCovers=
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<String> allowedLibraryUris=
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final class LibraryCover {
+        final Uri uri; final String name; final long size,modified;
+        LibraryCover(Uri uri,String name,long size,long modified){
+            this.uri=uri;this.name=name;this.size=size;this.modified=modified;
+        }
+    }
+''')
+once('''        web = new WebView(this);
+        setContentView(web);''','''        web = new WebView(this);
+        setContentView(web);
+        String libraryValue=getSharedPreferences("library",MODE_PRIVATE).getString("tree",null);
+        if(libraryValue!=null)try{libraryTree=Uri.parse(libraryValue);}catch(Exception ignored){}''')
+once('''                    String assetPath=u.getPath();
+                    if(assetPath!=null&&imageStreamToken!=null&&''','''                    String assetPath=u.getPath();
+                    if(assetPath!=null&&assetPath.startsWith("/cover/")){
+                        LibraryCover ref=libraryCovers.get(assetPath.substring("/cover/".length()));
+                        if(ref==null)return new WebResourceResponse("image/jpeg",null,
+                            new ByteArrayInputStream(new byte[0]));
+                        try{
+                            return new WebResourceResponse("image/jpeg",null,
+                                ReaderCovers.open(MainActivity.this,ref.uri,ref.name,ref.size,ref.modified));
+                        }catch(Exception ignored){
+                            return new WebResourceResponse("image/jpeg",null,
+                                new ByteArrayInputStream(new byte[0]));
+                        }
+                    }
+                    if(assetPath!=null&&imageStreamToken!=null&&''')
+once('''        if (requestCode == REQ_OPEN) {''','''        if(requestCode==REQ_LIBRARY_TREE){
+            try{
+                getContentResolver().takePersistableUriPermission(
+                    uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                libraryTree=uri;
+                getSharedPreferences("library",MODE_PRIVATE).edit()
+                    .putString("tree",uri.toString()).apply();
+                js("window.FileGestionerLibrary?.openCollection()");
+            }catch(Exception e){
+                js("window.showError("+q("The chosen folder cannot be retained: "+message(e))+")");
+            }
+            return;
+        }
+        if(requestCode==REQ_KOIKATSU_PREVIEW){
+            try{
+                int flags=data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION;
+                getContentResolver().takePersistableUriPermission(uri,flags);
+                if(currentUri!=null){
+                    getSharedPreferences("koikatsu",MODE_PRIVATE).edit()
+                        .putString("preview:"+currentUri.toString(),uri.toString()).apply();
+                }
+                openUri(uri);
+            }catch(Exception e){js("window.showError("+q(message(e))+")");}
+            return;
+        }
+        if (requestCode == REQ_OPEN) {''')
+once('''    private void openUri(Uri uri) {''','''    private void selectLibraryFolder(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent,REQ_LIBRARY_TREE);
+    }
+    private void selectKoikatsuPreview(){
+        Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.setType("*/*");
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|
+            Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent,REQ_KOIKATSU_PREVIEW);
+    }
+    private String savedCharacterPreview(){
+        if(currentUri==null)return null;
+        String value=getSharedPreferences("koikatsu",MODE_PRIVATE).getString(
+            "preview:"+currentUri.toString(),null);
+        if(value==null)return null;
+        Uri paired=Uri.parse(value);
+        return hasDurableReadGrant(paired)?value:null;
+    }
+    private void loadLibrary(String folder){
+        final Uri root=libraryTree;
+        if(root==null){runOnUiThread(()->
+            js("window.FileGestionerLibrary?.missingCollection()"));return;}
+        io.execute(()->{
+            try{
+                ReaderLibrary.Listing listing=ReaderLibrary.list(this,root,folder);
+                libraryCovers.clear();allowedLibraryUris.clear();
+                org.json.JSONArray items=listing.items;
+                for(int i=0;i<items.length();i++){
+                    org.json.JSONObject item=items.getJSONObject(i);
+                    if(item.optBoolean("folder"))continue;
+                    String id=java.util.UUID.randomUUID().toString().replace("-","");
+                    Uri file=Uri.parse(item.getString("uri"));
+                    allowedLibraryUris.add(file.toString());
+                    libraryCovers.put(id,new LibraryCover(
+                        file,item.optString("name"),item.optLong("size",-1),
+                        item.optLong("modified",0)));
+                    item.put("cover","https://fg-assets.invalid/cover/"+id);
+                }
+                String json=new org.json.JSONObject()
+                    .put("folder",listing.folder).put("items",items).toString();
+                runOnUiThread(()->js("window.FileGestionerLibrary?.receive("+json+")"));
+            }catch(Throwable error){
+                runOnUiThread(()->js("window.FileGestionerLibrary?.error("+q(message(error))+")"));
+            }
+        });
+    }
+    private void openUri(Uri uri) {''')
+once('''                    BookArchive candidate=new BookArchive(this,uri,false);
+                    bookArchive=candidate;''','''                    long indexedAt=android.os.SystemClock.elapsedRealtime();
+                    BookArchive candidate=new BookArchive(this,uri,false);
+                    android.util.Log.i("FG_ARCHIVE","ZIP_READY count="+candidate.imageCount()+
+                        " comic="+candidate.comicLike()+" elapsed_ms="+
+                        (android.os.SystemClock.elapsedRealtime()-indexedAt));
+                    bookArchive=candidate;''')
+once('''                    imageStreamToken=java.util.UUID.randomUUID().toString();
+                    remember(uri,name,currentMime);
+                    String url="https://fg-assets.invalid/raw/"+imageStreamToken+"/image";
+                    String payload="{\\"type\\":\\"image\\",\\"name\\":"+q(name)+''','''                    imageStreamToken=java.util.UUID.randomUUID().toString();
+                    boolean character="png".equals(quickType)&&KoikatsuCards.isCharacterCard(this,uri);
+                    remember(uri,name,currentMime);
+                    String url="https://fg-assets.invalid/raw/"+imageStreamToken+"/image";
+                    String payload="{\\"type\\":\\"image\\",\\"name\\":"+q(name)+
+                        ",\\"koikatsuCard\\":"+character+
+                        ",\\"linked3d\\":"+(character&&savedCharacterPreview()!=null)+''')
+once('''        @JavascriptInterface public void pickFile(){ runOnUiThread(MainActivity.this::openPicker); }''','''        @JavascriptInterface public void pickFile(){ runOnUiThread(MainActivity.this::openPicker); }
+        @JavascriptInterface public void readerDiagnostic(String event){
+            if(event!=null&&event.length()<100)
+                android.util.Log.i("FG_READER_UI",event);
+        }
+        @JavascriptInterface public void pickLibraryFolder(){
+            runOnUiThread(MainActivity.this::selectLibraryFolder);
+        }
+        @JavascriptInterface public String getLibraryRoot(){
+            return libraryTree==null?"":libraryTree.toString();
+        }
+        @JavascriptInterface public void listLibrary(String folder){loadLibrary(folder);}
+        @JavascriptInterface public void openLibraryFile(String value){
+            if(!allowedLibraryUris.contains(value))return;
+            runOnUiThread(()->openUri(Uri.parse(value)));
+        }
+        @JavascriptInterface public void openKoikatsu3d(){
+            runOnUiThread(()->{
+                String preview=savedCharacterPreview();
+                if(preview!=null)openUri(Uri.parse(preview));
+                else selectKoikatsuPreview();
+            });
+        }
+''')
+main.write_text(s)
+print("Native premium bookshelf, lazy cover URLs and Koikatsu 3D preview pairing connected.")

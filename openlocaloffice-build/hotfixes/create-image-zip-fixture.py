@@ -2,9 +2,9 @@
 """Small, synthetic 102-image ZIP comic regression fixture.
 Contains no copyrighted images, TeraBox credentials, or personal files.
 """
-import struct,sys,zlib
+import struct,sys,zlib,os
 from pathlib import Path
-from zipfile import ZipFile,ZIP_DEFLATED
+from zipfile import ZipFile,ZIP_DEFLATED,ZIP_STORED
 
 out=Path(sys.argv[1]) if len(sys.argv)>1 else Path("synthetic-comic.zip")
 out.parent.mkdir(parents=True,exist_ok=True)
@@ -21,4 +21,10 @@ with ZipFile(out,"w",ZIP_DEFLATED,allowZip64=True) as archive:
         n=(i*37)%102+1
         archive.writestr("Example book/"+str(n)+".png",image(n))
     archive.writestr("Example book/readme.txt","Synthetic comic regression fixture",ZIP_DEFLATED)
+    # >30MiB ZIP, but still 102 true images: index time must not scale
+    # with the byte size of this intentionally unreferenced payload.
+    with archive.open("Example book/.synthetic-padding","w",force_zip64=True) as out:
+        for _ in range(33):
+            out.write(os.urandom(1024*1024))
+
 print("Created 102-image ZIP with filenames out of order:",out.stat().st_size,"bytes")

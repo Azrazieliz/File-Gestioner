@@ -513,6 +513,9 @@ function archive(){
        const ext=entry.name.split('.').pop().toLowerCase();
        const im=E('img','fg-archive-img');im.alt=entry.name;
        im.loading='lazy';
+       im.addEventListener('load',()=>{
+         if(isComic)bridge()?.readerDiagnostic?.('COMIC_IMAGE_LOADED');
+       },{once:true});
        im.src=entry.streamed?(bridge()?.getArchiveImageUrl?.(entry.name)||''):
          'data:image/'+(ext==='jpg'?'jpeg':ext)+';base64,'+data;
        dest.appendChild(im);
