@@ -200,8 +200,24 @@ search.addEventListener('input',()=>{phrase=search.value;render();});
 const homeNav=b('Library','fg-lib-top-link',show);
 homeNav.title='Open your library';
 document.querySelector('.bar .actions')?.prepend(homeNav);
+function handleAndroidBack(){
+ // Reading settings are a modal surface, not an exit command.
+ const drawer=document.querySelector('.fg-book-drawer:not(.fg-book-hidden)');
+ if(drawer){drawer.classList.add('fg-book-hidden');return true;}
+ if(visible){
+   if(stack.length){navigateBack();return true;}
+   // Root collection is the app's top-level destination.
+   return false;
+ }
+ // Return to the actual library, regardless of whether the source was
+ // opened through Round Sync, Files, or a collection tile.
+ show();
+ return true;
+}
 window.FileGestionerLibrary={
- show,receive,error,openCollection:()=>{
+ show,receive,error,handleBack:handleAndroidBack,
+ isVisible:()=>visible,
+ openCollection:()=>{
    currentFolder='';stack=[];show();
  },missingCollection:showEmpty
 };
