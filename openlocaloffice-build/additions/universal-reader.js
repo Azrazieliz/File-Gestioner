@@ -262,15 +262,53 @@ function addLines(host,raw,format){
  flush();
  if(codeBlock)host.appendChild(E('pre','fg-document-code',codeBlock.join('\n')));
 }
+/* TXT, Markdown, EPUB, ODT/ODS text and code all scroll in ONE document.
+   Large sources append source-preserving blocks rather than artificial pages. */
 function textView(){
  const text=String(bridge()?.getText?.()||'');
- const pages=readablePages(text,doc.format);
- page=Math.min(page,pages.length-1);
- const [bar,tools]=toolbar('Document view · original paragraph boundaries');
- controls(tools,pages.length,textView);zoomer(tools,textView);
- const body=E('div','fg-reader-scroll'),p=paper('fg-document-sheet');
- addLines(p,pages[page],doc.format);
- body.appendChild(p);stage(bar,body);
+ const [bar,tools]=toolbar('Continuous document · vertical scrolling');
+ const body=E('div','fg-reader-scroll fg-text-scroll');
+ const sheet=paper('fg-document-sheet fg-continuous-text');
+ sheet.setAttribute('role','document');
+ sheet.setAttribute('aria-label',doc.name||'Document');
+ let size=1;
+ const setSize=delta=>{
+   size=Math.max(.75,Math.min(2,Math.round((size+delta)*100)/100));
+   sheet.style.setProperty('--fg-size',String(size));
+ };
+ tools.append(button('A−',()=>setSize(-.1)),button('A+',()=>setSize(.1)));
+ if(text.length<=2_000_000) {
+   addLines(sheet,text,doc.format);
+ } else {
+   // Very large files: preserve every character, including whitespace and
+   // original line breaks, while avoiding a monolithic UI-thread DOM build.
+   let offset=0,loading=false;
+   function append(){
+     if(loading||offset>=text.length)return;
+     loading=true;
+     const frag=document.createDocumentFragment();
+     for(let n=0;n<3&&offset<text.length;n++){
+       let end=Math.min(text.length,offset+64_000);
+       if(end<text.length){
+         const cut=text.lastIndexOf('\n',end);
+         if(cut>offset+32_000)end=cut+1;
+       }
+       const part=E('pre','fg-document-code fg-raw-text',text.slice(offset,end));
+       frag.appendChild(part);offset=end;
+     }
+     sheet.appendChild(frag);loading=false;
+   }
+   append();
+   let ticking=false;
+   body.addEventListener('scroll',()=>{
+     if(ticking)return;ticking=true;
+     requestAnimationFrame(()=>{
+       ticking=false;
+       if(body.scrollTop+body.clientHeight>body.scrollHeight-1000)append();
+     });
+   },{passive:true});
+ }
+ body.appendChild(sheet);stage(bar,body);
 }
 /* DOCX reads body blocks in order, keeps tables together, and scrolls without
    manufacturing pages every 150 paragraphs. Windows are lazily appended. */
@@ -285,17 +323,14 @@ function docx(){
  sheet.setAttribute('aria-label',doc.name||'Word document');
  const progress=E('span','fg-reader-counter','');
  const message=E('div','fg-docx-message','');
- const more=button('Load more ↓',()=>appendNext());
  const foot=E('div','fg-docx-foot');
- foot.append(progress,more);
+ foot.append(progress);
  body.append(sheet,foot);
  let next=0,start=0,loading=false,lastSearch=0;
  const chunk=24;
  function updateProgress(){
    const done=Math.min(count,next);
    progress.textContent=count?done+' / '+count+' blocks':'Empty document';
-   more.disabled=next>=count;
-   more.classList.toggle('hidden',next>=count);
  }
  function appendNext(){
    if(loading||next>=count)return;
@@ -317,7 +352,6 @@ function docx(){
      message.textContent=start?'Showing from document block '+(start+1):'';
    }catch(e){
      message.textContent='Cannot render this section: '+String(e.message||e);
-     more.disabled=true;
    }finally{loading=false;updateProgress();}
  }
  function showFrom(index){
