@@ -57,7 +57,7 @@ java.write_text(j)
 repl(js,"const ro=d=>['pdf','image','reader','archive','binary'].includes(d?.type)",
         "const ro=d=>['pdf','image','reader','archive','binary','model3d'].includes(d?.type)")
 repl(js,
-    "window.loadDocument=function(d){\n  if(assetUrl)",
+    "window.loadDocument=function(d){\n if(assetUrl)",
     "window.loadDocument=function(d){\n  window.FileGestionerModelViewer?.dispose?.();\n  if(assetUrl)")
 repl(js,
     "  else if(d.type==='docx')docx();",
