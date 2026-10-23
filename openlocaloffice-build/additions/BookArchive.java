@@ -308,14 +308,27 @@ public final class BookArchive implements Closeable {
             return output.toByteArray();
         }
     }
+    /** Android's default DocumentBuilderFactory does not implement every
+     * desktop Xerces setFeature flag. Reject DTD/entity declarations before
+     * parsing, disable expansion and block all resolver I/O. */
     private static org.w3c.dom.Document document(byte[] bytes) throws Exception{
+        if(bytes.length>MAX_METADATA_BYTES)throw new IOException("Metadata limit exceeded");
+        String xml=new String(bytes,StandardCharsets.UTF_8);
+        // Do not let an EPUB fetch external DTDs or expand entity declarations.
+        String probe=xml.toUpperCase(Locale.ROOT);
+        if(probe.contains("<!DOCTYPE")||probe.contains("<!ENTITY"))
+            throw new IOException("Unsafe DTD or entity declaration in EPUB package");
         DocumentBuilderFactory f=DocumentBuilderFactory.newInstance();
         f.setNamespaceAware(true);
-        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
-        f.setFeature("http://xml.org/sax/features/external-general-entities",false);
-        f.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
         f.setExpandEntityReferences(false);
-        return f.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
+        try{f.setFeature("http://xml.org/sax/features/external-general-entities",false);}
+        catch(javax.xml.parsers.ParserConfigurationException ignored){}
+        try{f.setFeature("http://xml.org/sax/features/external-parameter-entities",false);}
+        catch(javax.xml.parsers.ParserConfigurationException ignored){}
+        javax.xml.parsers.DocumentBuilder builder=f.newDocumentBuilder();
+        builder.setEntityResolver((publicId,systemId)->
+            new org.xml.sax.InputSource(new java.io.StringReader("")));
+        return builder.parse(new ByteArrayInputStream(bytes));
     }
     private static Element element(Node node){return node instanceof Element?(Element)node:null;}
     private static String field(Element e,String attr){return e==null?"":e.getAttribute(attr);}
