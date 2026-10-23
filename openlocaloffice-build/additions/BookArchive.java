@@ -1,0 +1,279 @@
+package com.openlocal.office.core;
+
+import android.content.Context;
+import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.webkit.WebResourceResponse;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.w3c.dom.*;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.zip.*;
+
+/** Read-only, seekable ZIP/EPUB reader that never loads an entire book into memory.
+ * A 5+ GiB EPUB can be opened if the document provider gives a seekable descriptor,
+ * or if the device has space for a temporary disk-backed copy.
+ * Zip entries are read on demand; no file-wide 80 MiB gate.
+ */
+public final class BookArchive implements Closeable {
+    private final Context context;
+    private final Uri uri;
+    private final ParcelFileDescriptor descriptor;
+    private final File temporary;
+    private final ZipFile zip;
+    private final String token;
+    private final ArrayList<Chapter> chapters = new ArrayList<>();
+    private final LinkedHashMap<String,String> titles = new LinkedHashMap<>();
+    private String bookTitle = "";
+    private String author = "";
+    private final ArrayList<String> archiveImages = new ArrayList<>();
+    private static final int MAX_CHAPTER_BYTES=6*1024*1024;
+    private static final int MAX_METADATA_BYTES=2*1024*1024;
+    private static final int MAX_IMAGE_BYTES=128*1024*1024;
+
+    private static final class Chapter {
+        final String name;
+        final String title;
+        Chapter(String name,String title){this.name=name;this.title=title;}
+    }
+
+    public BookArchive(Context ctx,Uri source,boolean epub) throws Exception {
+        context=ctx.getApplicationContext();
+        uri=source;
+        token=UUID.randomUUID().toString();
+        ParcelFileDescriptor handle=null;
+        File temp=null;
+        ZipFile opened=null;
+        try {
+            handle=context.getContentResolver().openFileDescriptor(uri,"r");
+            if(handle==null)throw new IOException("Cannot read this document provider");
+            try {
+                // Seekable providers: ZipFile opens the original SAF descriptor
+                // via /proc/self/fd. No copy, even for multi-gigabyte books.
+                opened=new ZipFile("/proc/self/fd/"+handle.getFd());
+            } catch(Exception unsupported) {
+                // Virtual/non-seekable provider: copy in bounded 128 KiB buffers,
+                // never into a Java byte[]. Requires device cache free space.
+                File dir=new File(context.getCacheDir(),"reading");
+                if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create offline reading cache");
+                temp=File.createTempFile("book-",".zip",dir);
+                try(InputStream input=context.getContentResolver().openInputStream(uri);
+                    OutputStream output=new BufferedOutputStream(new FileOutputStream(temp),128*1024)){
+                    if(input==null)throw new IOException("The document provider could not stream this book");
+                    byte[] buffer=new byte[128*1024];
+                    int n;
+                    while((n=input.read(buffer))!=-1)output.write(buffer,0,n);
+                }catch(IOException e){
+                    temp.delete();
+                    throw new IOException("The provider is not seekable and the book cannot be cached. Check available device storage.",e);
+                }
+                opened=new ZipFile(temp);
+            }
+            zip=opened;
+            descriptor=handle;
+            temporary=temp;
+            Enumeration<? extends ZipEntry> entries=zip.entries();
+            int index=0;
+            while(entries.hasMoreElements()){
+                ZipEntry entry=entries.nextElement();
+                if(++index>150000)throw new IOException("Archive index is unusually large");
+                String name=entry.getName();
+                if(!entry.isDirectory()&&isImage(name))archiveImages.add(name);
+            }
+            if(epub)readPackage();
+        }catch(Exception failure){
+            if(opened!=null)try{opened.close();}catch(IOException ignored){}
+            if(handle!=null)try{handle.close();}catch(IOException ignored){}
+            if(temp!=null)temp.delete();
+            throw failure;
+        }
+    }
+    public String token(){return token;}
+    public String title(){return bookTitle;}
+    public String author(){return author;}
+    public int chapterCount(){return chapters.size();}
+    public int imageCount(){return archiveImages.size();}
+    public String imageName(int index){return archiveImages.get(index);}
+    public String assetUrl(String name){return "https://fg-assets.invalid/book/"+token+"/"+encodePath(name);}
+    public JSONObject metadata() throws Exception {
+        JSONObject object=new JSONObject();
+        object.put("type","epub");
+        object.put("format","epub");
+        object.put("title",bookTitle);
+        object.put("author",author);
+        object.put("chapters",chapters.size());
+        object.put("token",token);
+        return object;
+    }
+    public JSONArray contents() throws Exception {
+        JSONArray list=new JSONArray();
+        for(int i=0;i<chapters.size();i++){
+            Chapter c=chapters.get(i);
+            list.put(new JSONObject().put("index",i).put("title",c.title));
+        }
+        return list;
+    }
+    public JSONObject chapter(int index) throws Exception {
+        if(index<0||index>=chapters.size())throw new IOException("Chapter index out of range");
+        Chapter c=chapters.get(index);
+        byte[] data=readSmall(c.name,MAX_CHAPTER_BYTES);
+        return new JSONObject()
+            .put("index",index).put("title",c.title)
+            .put("base",assetUrl(c.name)).put("html",new String(data,StandardCharsets.UTF_8));
+    }
+    public JSONArray images() throws Exception {
+        JSONArray list=new JSONArray();
+        for(int i=0;i<archiveImages.size();i++) {
+            String entry=archiveImages.get(i);
+            list.put(new JSONObject().put("index",i).put("name",entry));
+        }
+        return list;
+    }
+    public WebResourceResponse response(String requestedPath) throws IOException {
+        // The URL contains an unguessable session token and a path that is
+        // compared against actual ZipFile entries. Never fetch outside the EPUB.
+        String prefix="/book/"+token+"/";
+        if(!requestedPath.startsWith(prefix))return null;
+        String path=decodePath(requestedPath.substring(prefix.length()));
+        if(path.startsWith("/")||path.contains("\\")||path.contains("\0")||
+           path.contains("../")||path.equals(".."))return null;
+        ZipEntry entry=zip.getEntry(path);
+        if(entry==null||entry.isDirectory()||!isImage(path))return null;
+        if(entry.getSize()>MAX_IMAGE_BYTES)throw new IOException("A single book image exceeds the 128 MiB decoding safety limit");
+        InputStream stream=zip.getInputStream(entry);
+        return new WebResourceResponse(mime(path),null,new BoundedStream(stream,MAX_IMAGE_BYTES));
+    }
+    public String archiveEntry(int index) throws Exception {
+        if(index<0||index>=archiveImages.size())throw new IOException("Image index invalid");
+        return assetUrl(archiveImages.get(index));
+    }
+    private static boolean isImage(String name){
+        String lower=name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".jpg")||lower.endsWith(".jpeg")||lower.endsWith(".png")||
+            lower.endsWith(".gif")||lower.endsWith(".webp")||lower.endsWith(".avif")||
+            lower.endsWith(".svg")||lower.endsWith(".bmp");
+    }
+    private static String mime(String name){
+        String n=name.toLowerCase(Locale.ROOT);
+        if(n.endsWith(".png"))return "image/png";
+        if(n.endsWith(".gif"))return "image/gif";
+        if(n.endsWith(".webp"))return "image/webp";
+        if(n.endsWith(".avif"))return "image/avif";
+        if(n.endsWith(".svg"))return "image/svg+xml";
+        if(n.endsWith(".bmp"))return "image/bmp";
+        return "image/jpeg";
+    }
+    private static String encodePath(String path){
+        // Encode each segment without allowing an external URL. URL encoding
+        // encodes spaces as +; replace with %20 for URLs.
+        StringBuilder out=new StringBuilder();
+        for(String part:path.split("/",-1)){
+            if(out.length()>0)out.append('/');
+            try{out.append(java.net.URLEncoder.encode(part,"UTF-8").replace("+","%20"));}
+            catch(Exception e){throw new IllegalArgumentException(e);}
+        }
+        return out.toString();
+    }
+    private static String decodePath(String path){
+        try{return java.net.URLDecoder.decode(path,"UTF-8");}
+        catch(Exception e){return "";}
+    }
+    private byte[] readSmall(String path,int max) throws IOException{
+        ZipEntry e=zip.getEntry(path);
+        if(e==null)throw new IOException("Book resource not found: "+path);
+        if(e.getSize()>max)throw new IOException("A chapter is too large for one render section");
+        try(InputStream stream=zip.getInputStream(e)){
+            ByteArrayOutputStream output=new ByteArrayOutputStream();
+            byte[] buffer=new byte[32768];int n;
+            while((n=stream.read(buffer))!=-1){
+                if(output.size()+n>max)throw new IOException("Book chapter exceeds bounded render buffer");
+                output.write(buffer,0,n);
+            }
+            return output.toByteArray();
+        }
+    }
+    private static org.w3c.dom.Document document(byte[] bytes) throws Exception{
+        DocumentBuilderFactory f=DocumentBuilderFactory.newInstance();
+        f.setNamespaceAware(true);
+        f.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
+        f.setFeature("http://xml.org/sax/features/external-general-entities",false);
+        f.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
+        f.setExpandEntityReferences(false);
+        return f.newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
+    }
+    private static Element element(Node node){return node instanceof Element?(Element)node:null;}
+    private static String field(Element e,String attr){return e==null?"":e.getAttribute(attr);}
+    private static String contents(Element root,String name){
+        NodeList nodes=root.getElementsByTagNameNS("*",name);
+        return nodes.getLength()>0?nodes.item(0).getTextContent().trim():"";
+    }
+    private static String folder(String name){
+        int i=name.lastIndexOf('/');return i<0?"":name.substring(0,i+1);
+    }
+    private static String normalPath(String from,String href){
+        try {
+            String hrefPath=href.split("[?#]",2)[0];
+            String combined=folder(from)+java.net.URLDecoder.decode(hrefPath,"UTF-8");
+            Deque<String> segments=new ArrayDeque<>();
+            for(String section:combined.split("/")){
+                if(section.isEmpty()||section.equals("."))continue;
+                if(section.equals("..")){
+                    if(segments.isEmpty())return "";
+                    segments.removeLast();
+                }else segments.addLast(section);
+            }
+            return String.join("/",segments);
+        }catch(Exception e){return "";}
+    }
+    private void readPackage() throws Exception {
+        org.w3c.dom.Document container=document(readSmall("META-INF/container.xml",MAX_METADATA_BYTES));
+        NodeList roots=container.getElementsByTagNameNS("*","rootfile");
+        if(roots.getLength()==0)throw new IOException("EPUB is missing its package description");
+        String opf=field(element(roots.item(0)),"full-path");
+        if(opf.isBlank())throw new IOException("EPUB package path missing");
+        org.w3c.dom.Document packageDoc=document(readSmall(opf,MAX_METADATA_BYTES));
+        Element root=packageDoc.getDocumentElement();
+        bookTitle=contents(root,"title");author=contents(root,"creator");
+        Map<String,String> byId=new LinkedHashMap<>();
+        Map<String,String> display=new LinkedHashMap<>();
+        NodeList manifest=packageDoc.getElementsByTagNameNS("*","item");
+        for(int i=0;i<manifest.getLength();i++){
+            Element item=element(manifest.item(i));
+            String id=field(item,"id"),href=field(item,"href");
+            if(id.isBlank()||href.isBlank())continue;
+            String name=normalPath(opf,href);
+            if(!name.isBlank()){byId.put(id,name);display.put(id,href);}
+        }
+        NodeList spine=packageDoc.getElementsByTagNameNS("*","itemref");
+        for(int i=0;i<spine.getLength();i++){
+            Element item=element(spine.item(i));
+            String id=field(item,"idref"),name=byId.get(id);
+            if(name==null||!name.toLowerCase(Locale.ROOT).matches(".*\\.x?html?$"))continue;
+            String title=display.getOrDefault(id,"Chapter "+(chapters.size()+1));
+            title=title.substring(title.lastIndexOf('/')+1).replaceAll("(?i)\\.x?html?$","")
+                .replace('_',' ').replaceAll("^[0-9]+[._ -]*","").trim();
+            if(title.isBlank())title="Chapter "+(chapters.size()+1);
+            chapters.add(new Chapter(name,title));
+        }
+        if(chapters.isEmpty())throw new IOException("EPUB contains no readable spine chapters");
+    }
+    @Override public void close() throws IOException {
+        zip.close();descriptor.close();
+        if(temporary!=null)temporary.delete();
+    }
+    private static final class BoundedStream extends FilterInputStream{
+        private final long limit;private long total;
+        BoundedStream(InputStream source,long max){super(source);limit=max;}
+        @Override public int read()throws IOException{
+            int n=super.read();if(n!=-1&&++total>limit)throw new IOException("Book image too large");return n;
+        }
+        @Override public int read(byte[] data,int off,int len)throws IOException{
+            int n=super.read(data,off,len);
+            if(n>0&&(total+=n)>limit)throw new IOException("Book image too large");
+            return n;
+        }
+    }
+}
