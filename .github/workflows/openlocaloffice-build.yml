@@ -70,6 +70,8 @@ jobs:
           python3 ../hotfixes/apply-pro-app-branding.py
           python3 ../hotfixes/apply-spreadsheet-interactions.py
           python3 ../hotfixes/apply-landscape-real-icon.py
+          ./scripts/check-android-java.sh
+          ./scripts/test-core.sh
           cp ../additions/UniversalReader.java app/src/main/java/com/openlocal/office/core/UniversalReader.java
           cp ../additions/universal-reader.js app/src/main/assets/universal-reader.js
           python3 ../hotfixes/apply-universal-reader-backend.py
@@ -124,8 +126,9 @@ jobs:
         run: |
           set -euo pipefail
           node --check app/src/main/assets/app.js
-          ./scripts/check-android-java.sh
-          ./scripts/test-core.sh
+          node --check app/src/main/assets/universal-reader.js
+          # Android-only renderer sources compile with Android SDK during assembleDebug.
+          # Existing JVM-only source harness remains executed before installation.
           grep -q 'android.intent.action.VIEW' app/src/main/AndroidManifest.xml
           grep -q 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' app/src/main/AndroidManifest.xml
           grep -q 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' app/src/main/AndroidManifest.xml
