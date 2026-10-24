@@ -279,6 +279,8 @@ jobs:
           emulator-boot-timeout: 1200
           disable-animations: true
           script: |
+            # android-emulator-runner invokes /bin/sh; launch bash explicitly.
+            bash <<'FG_ANDROID_SMOKE'
             set -euo pipefail
             mkdir -p screenshots
             capture_diagnostics() {
@@ -340,6 +342,7 @@ jobs:
               exit 1
             fi
             rm -f /tmp/fg-large-book.epub /tmp/fg-102-images.zip
+            FG_ANDROID_SMOKE
 
       - name: Upload runtime evidence even after a failure
         if: always()
