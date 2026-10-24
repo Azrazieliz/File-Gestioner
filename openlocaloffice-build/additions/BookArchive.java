@@ -108,7 +108,7 @@ public final class BookArchive implements Closeable {
                 String name=entry.getName();
                 if(!entry.isDirectory()){
                     archiveAll.add(name);
-                    if(isImage(name))archiveImages.add(name);
+                    if(isReadablePage(name))archiveImages.add(name);
                 }
             }
             // Comic reading order is 1, 2, 3 ... 10, NOT 1, 10, 2.
@@ -274,6 +274,15 @@ public final class BookArchive implements Closeable {
     public String archiveEntry(int index) throws Exception {
         if(index<0||index>=archiveImages.size())throw new IOException("Image index invalid");
         return assetUrl(archiveImages.get(index));
+    }
+    /** ZIP metadata and Finder sidecar images must never become comic pages. */
+    private static boolean isReadablePage(String name){
+        if(!isImage(name))return false;
+        for(String segment:name.replace('\\','/').split("/")){
+            if(segment.startsWith(".")||segment.equalsIgnoreCase("__MACOSX")||
+               segment.equalsIgnoreCase("Thumbs.db"))return false;
+        }
+        return true;
     }
     private static boolean isImage(String name){
         String lower=name.toLowerCase(Locale.ROOT);
