@@ -2,7 +2,6 @@ using BepInEx;
 using UnityEngine;
 using System;
 using System.IO;
-using System.Linq;
 
 namespace FileGestioner.NativeRemote
 {
@@ -42,12 +41,15 @@ namespace FileGestioner.NativeRemote
                 if(File.Exists(framePath))File.Delete(framePath);
                 if(File.Exists(errorPath))File.Delete(errorPath);
 
-                var cameras=Camera.allCameras
-                    .Where(x=>x!=null&&x.enabled&&x.cullingMask!=0)
-                    .OrderByDescending(x=>x.depth).ToArray();
+                Camera[] cameras=Camera.allCameras;
                 Camera camera=Camera.main;
-                if(camera==null||!camera.enabled||camera.cullingMask==0)
-                    camera=cameras.FirstOrDefault();
+                if(camera==null||!camera.enabled||camera.cullingMask==0){
+                    camera=null;
+                    foreach(Camera candidate in cameras){
+                        if(candidate==null||!candidate.enabled||candidate.cullingMask==0)continue;
+                        if(camera==null||candidate.depth>camera.depth)camera=candidate;
+                    }
+                }
                 if(camera==null)throw new Exception("No active 3D camera");
                 var texture=new RenderTexture(width,height,24,RenderTextureFormat.ARGB32);
                 RenderTexture former=camera.targetTexture;
