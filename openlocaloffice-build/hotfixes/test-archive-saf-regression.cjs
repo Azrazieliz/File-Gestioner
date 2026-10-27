@@ -22,7 +22,7 @@ need(b.includes('new SeekableZip(handle)'),'SAF fd must use direct random-access
 need(b.includes('if(seekable)throw new IOException('),'Seekable providers must not be copied after ZIP index failure');
 need(b.includes('if(advertised>0&&physical>=0&&physical<advertised)'),
   'Known incomplete cloud files must be rejected before a second copy');
-need(b.includes('RemoteBookSpool.obtain(context,uri,advertised)')&&
+need(b.includes('RemoteBookSpool.obtain(context,uri,advertised,preview)')&&
   spool.includes('expected>0&&copied!=expected'),
   'Non-seekable provider transfer must be verified after the shared spool');
 need(m.includes('getPersistedUriPermissions()'),'Recent references require durable SAF read grants');
