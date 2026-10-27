@@ -23,7 +23,7 @@ method=r'''        @JavascriptInterface public String getRemoteToken(){
             if(!"cube".equals(kind)){
                 if(source==null)return;
                 if("koikatsu".equals(kind)&&
-                    !com.openlocal.office.core.KoikatsuCards.isCharacterCard(MainActivity.this,source)){
+                    !source.equals(fgVerifiedKoikatsuCard)){
                     runOnUiThread(()->js("window.FileGestionerRemoteViewer.onOpen("+
                        q("{\"error\":\"The selected PNG is not a native Koikatsu card\"}")+")"));
                     return;
@@ -92,6 +92,14 @@ method=r'''        @JavascriptInterface public String getRemoteToken(){
         }
 '''
 s=s.replace(anchor,method+anchor)
+# Reuse the card classification done when the PNG was opened, not another
+# full remote read merely to detect the same Koikatsu signature.
+field='    private volatile Uri libraryTree;'
+assert s.count(field)==1
+s=s.replace(field,'    private volatile Uri fgVerifiedKoikatsuCard;\n'+field,1)
+signature='boolean character="png".equals(quickType)&&KoikatsuCards.isCharacterCard(this,uri);'
+assert s.count(signature)==1
+s=s.replace(signature,signature+'\n                    fgVerifiedKoikatsuCard=character?uri:null;',1)
 main.write_text(s)
 js=root/"assets/universal-reader.js"
 s=js.read_text()
