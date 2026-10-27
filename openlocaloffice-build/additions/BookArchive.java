@@ -62,8 +62,13 @@ public final class BookArchive implements Closeable {
                 (android.os.SystemClock.elapsedRealtime()-providerStart)+
                 " authority="+uri.getAuthority());
             if(handle==null)throw new IOException("Cannot read this document provider");
+            android.util.Log.i("FG_PERF","SIZE_QUERY_BEGIN");
+            long sizeStart=android.os.SystemClock.elapsedRealtime();
             long advertised=providerLength();
+            android.util.Log.i("FG_PERF","SIZE_QUERY_ms="+
+                (android.os.SystemClock.elapsedRealtime()-sizeStart));
             long physical=handle.getStatSize();
+            android.util.Log.i("FG_PERF","FD_STAT_DONE");
             // A cloud provider can publish the intended size while still
             // downloading the file. Do not treat its partial local payload as
             // a valid permanent source or blindly copy it again.
@@ -76,6 +81,7 @@ public final class BookArchive implements Closeable {
                 // Unlike ZipFile("/proc/self/fd/NN"), this does not reopen
                 // provider-owned FDs and does not download/copy them a second time.
                 long indexStart=android.os.SystemClock.elapsedRealtime();
+                android.util.Log.i("FG_PERF","ZIP_INDEX_BEGIN");
                 opened=new SeekableZip(handle);
                 android.util.Log.i("FG_PERF","ZIP_INDEX_ms="+
                     (android.os.SystemClock.elapsedRealtime()-indexStart));
