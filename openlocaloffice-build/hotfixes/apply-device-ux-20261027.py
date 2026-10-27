@@ -125,6 +125,10 @@ if(quick){
 }
 """
 s=s.replace(old,extra+old)
+# Rebuilding a single cell must not reinitialize the entire grid.
+old="new MutationObserver(sync).observe(E,{childList:true,subtree:true});"
+assert old in s
+s=s.replace(old,"new MutationObserver(sync).observe(E,{childList:true,subtree:false});")
 app.write_text(s)
 
 css=assets/"style.css"
