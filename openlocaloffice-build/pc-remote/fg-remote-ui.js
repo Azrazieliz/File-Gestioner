@@ -141,9 +141,16 @@ if(typeof originalLoad==='function'){
 document.body.append(entry);
 // Independent cube entry belongs to the Library's 3D tools, never on PDFs,
 // books, spreadsheets or ordinary images. No permanent floating 3D control.
-const cubeEntry=el('button','fg-lib-secondary fg-pc-cube','Blender cube');
+const cubeEntry=el('button','fg-lib-filter fg-pc-cube','Blender cube');
 cubeEntry.type='button';cubeEntry.title='Render independent Blender cube on PC';
 cubeEntry.onclick=()=>open('cube');
-document.querySelector('#fg-library .fg-lib-actions')?.append(cubeEntry);
+// Keep the primary Open file / Collection header uncluttered.
+function placeCubeEntry(){
+ const filters=document.querySelector('#fg-library .fg-lib-filters');
+ if(filters&&!filters.contains(cubeEntry))filters.append(cubeEntry);
+}
+const observer=new MutationObserver(placeCubeEntry);
+const filters=document.querySelector('#fg-library .fg-lib-filters');
+if(filters){observer.observe(filters,{childList:true});placeCubeEntry();}
 
 })();
