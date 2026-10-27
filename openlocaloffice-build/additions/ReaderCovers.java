@@ -43,9 +43,6 @@ public final class ReaderCovers {
         String key=hash(source.toString()+"|"+size+"|"+lastModified);
         File cached=new File(dir,key+".jpg");
         if(cached.exists()&&cached.length()>0)return new FileInputStream(cached);
-        if(isExpensiveCloudCover(source,name)&&
-            !RemoteBookSpool.hasCompleted(ctx,source,size))
-            throw new IOException("Remote archive cover deferred until the book is locally cached");
         boolean acquired=false;
         try {
             WORKERS.acquire();
@@ -55,7 +52,8 @@ public final class ReaderCovers {
             // 2GiB remote ZIP would copy the *entire* file. Skip it instead.
             if(isArchive(name)&&size>64L*1024*1024&&!seekable(ctx,source))
                 throw new IOException("Cloud archive needs a local/seekable copy before cover preview");
-            Bitmap bitmap=decode(ctx,source,name);
+            Bitmap bitmap=isExpensiveCloudCover(source,name)&&isArchive(name)?
+                decodeCloudArchiveCover(ctx,source,size):decode(ctx,source,name);
             if(bitmap==null)throw new IOException("No supported illustration/cover");
             File temp=new File(dir,key+".tmp");
             try(FileOutputStream out=new FileOutputStream(temp)){
@@ -84,6 +82,86 @@ public final class ReaderCovers {
             Os.lseek(fd.getFileDescriptor(),0,OsConstants.SEEK_CUR);
             return true;
         }catch(Exception e){return false;}
+    }
+    /** Bound cloud thumbnail reads to an early ZIP prefix: never copy an
+     * entire book just to display a cover. The provider stream is closed
+     * immediately after finding an image or reaching the read budget.
+     */
+    private static Bitmap decodeCloudArchiveCover(Context ctx,Uri uri,long size)
+        throws IOException {
+        File local=RemoteBookSpool.completedFile(ctx,uri,size);
+        if(local!=null){
+            try(java.util.zip.ZipFile zip=new java.util.zip.ZipFile(local)){
+                java.util.zip.ZipEntry selected=null;
+                java.util.Enumeration<? extends java.util.zip.ZipEntry> all=zip.entries();
+                while(all.hasMoreElements()){
+                    java.util.zip.ZipEntry item=all.nextElement();
+                    if(item.isDirectory()||!rasterEntry(item.getName()))continue;
+                    if(selected==null||preferredImageName(item.getName(),selected.getName())<0)
+                        selected=item;
+                }
+                if(selected!=null&&selected.getSize()<=7L*1024*1024){
+                    try(InputStream image=zip.getInputStream(selected)){
+                        return BitmapFactory.decodeStream(image);
+                    }
+                }
+            }catch(Exception error){
+                throw new IOException("Cached cloud cover could not be decoded",error);
+            }
+        }
+        final long limit=12L*1024*1024;
+        try(InputStream network=ctx.getContentResolver().openInputStream(uri)){
+            if(network==null)return null;
+            InputStream bounded=new java.io.FilterInputStream(network){
+                long used=0;
+                @Override public int read()throws IOException{
+                    if(used>=limit)throw new IOException("Cloud cover prefix budget reached");
+                    int b=in.read();if(b>=0)used++;return b;
+                }
+                @Override public int read(byte[] buffer,int off,int len)throws IOException{
+                    if(used>=limit)throw new IOException("Cloud cover prefix budget reached");
+                    int n=in.read(buffer,off,(int)Math.min(len,limit-used));
+                    if(n>0)used+=n;return n;
+                }
+            };
+            java.util.zip.ZipInputStream zip=new java.util.zip.ZipInputStream(
+                new BufferedInputStream(bounded,64*1024));
+            for(int entries=0;entries<80;entries++){
+                java.util.zip.ZipEntry item=zip.getNextEntry();
+                if(item==null)break;
+                if(!item.isDirectory()&&rasterEntry(item.getName())&&
+                    item.getSize()<=7L*1024*1024){
+                    java.io.ByteArrayOutputStream image=new java.io.ByteArrayOutputStream();
+                    byte[] bytes=new byte[32768];int count;
+                    while((count=zip.read(bytes))!=-1){
+                        if(image.size()+count>7*1024*1024)return null;
+                        image.write(bytes,0,count);
+                    }
+                    byte[] content=image.toByteArray();
+                    Bitmap bitmap=BitmapFactory.decodeByteArray(content,0,content.length);
+                    if(bitmap!=null)return bitmap;
+                }else{
+                    // Skip data, but never exceed the bounded provider reads.
+                    zip.closeEntry();
+                }
+            }
+        }catch(IOException notAvailable){
+            android.util.Log.i("FG_COVER","No cover in first 12 MiB of cloud ZIP: "+
+                notAvailable.getMessage());
+        }
+        return null;
+    }
+    private static boolean rasterEntry(String name){
+        String n=name.toLowerCase(Locale.ROOT);
+        return !n.startsWith(".")&&!n.contains("__macosx")&&!n.contains("/._")&&
+            (n.endsWith(".png")||n.endsWith(".jpg")||n.endsWith(".jpeg")||n.endsWith(".webp"));
+    }
+    private static int preferredImageName(String a,String b){
+        String x=a.toLowerCase(Locale.ROOT),y=b.toLowerCase(Locale.ROOT);
+        boolean ca=x.contains("cover"),cb=y.contains("cover");
+        if(ca!=cb)return ca?-1:1;
+        // Numeric ordering without loading image bytes.
+        return x.compareTo(y);
     }
     private static Bitmap decode(Context ctx,Uri uri,String name) throws IOException{
         String lower=name.toLowerCase(Locale.ROOT);
