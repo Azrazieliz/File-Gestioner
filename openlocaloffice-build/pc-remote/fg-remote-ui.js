@@ -124,17 +124,26 @@ function open(nextKind='cube'){
 window.FileGestionerRemoteViewer={open,onOpen,close};
 const entry=el('button','fg-pc-entry','PC 3D');
 entry.type='button';entry.setAttribute('aria-label','Open independent native Blender cube on PC');
-let entryKind='cube';
-entry.onclick=()=>open(entryKind);
+let entryKind=null;
+entry.hidden=true;
+entry.onclick=()=>{if(entryKind)open(entryKind);};
 const originalLoad=window.loadDocument;
 if(typeof originalLoad==='function'){
   window.loadDocument=function(documentInfo){
     entryKind=documentInfo?.koikatsuCard===true?'koikatsu':
-      documentInfo?.type==='model3d'&&['blend','blend1'].includes(documentInfo?.format)?'blend':'cube';
-    entry.textContent=entryKind==='koikatsu'?'Koikatsu 3D':
-      entryKind==='blend'?'Blender PC':'PC 3D';
+      documentInfo?.type==='model3d'&&['blend','blend1'].includes(documentInfo?.format)?'blend':null;
+    entry.hidden=!entryKind;
+    if(entryKind)entry.textContent=entryKind==='koikatsu'?'Open Koikatsu 3D':'Open in Blender';
+    close();
     return originalLoad.apply(this,arguments);
   };
 }
 document.body.append(entry);
+// Independent cube entry belongs to the Library's 3D tools, never on PDFs,
+// books, spreadsheets or ordinary images. No permanent floating 3D control.
+const cubeEntry=el('button','fg-lib-secondary fg-pc-cube','Blender cube');
+cubeEntry.type='button';cubeEntry.title='Render independent Blender cube on PC';
+cubeEntry.onclick=()=>open('cube');
+document.querySelector('#fg-library .fg-lib-actions')?.append(cubeEntry);
+
 })();
