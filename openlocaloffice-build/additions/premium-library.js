@@ -93,7 +93,7 @@ function card(item,i){
  fallback.append(E('span','fg-lib-fallback-glyph',icon(c)),
                  E('strong','fg-lib-fallback-title',item.title));
  cover.appendChild(fallback);
- if(item.cover&&!item.folder){
+ if(item.cover){
    const image=E('img','fg-lib-cover-image');
    image.loading='lazy';image.decoding='async';
    image.alt='Cover · '+item.title;
