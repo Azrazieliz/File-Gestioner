@@ -51,7 +51,7 @@ namespace FileGestioner.NativeRemote
                     }
                 }
                 if(camera==null)throw new Exception("No active 3D camera");
-                var texture=new RenderTexture(width,height,24,RenderTextureFormat.ARGB32);
+                RenderTexture texture=new RenderTexture(width,height,24,RenderTextureFormat.ARGB32);
                 RenderTexture former=camera.targetTexture;
                 RenderTexture before=RenderTexture.active;
                 Texture2D capture=null;
