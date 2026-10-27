@@ -23,7 +23,7 @@ method=r'''        @JavascriptInterface public String getRemoteToken(){
             if(!"cube".equals(kind)){
                 if(source==null)return;
                 if("koikatsu".equals(kind)&&
-                    !com.openlocal.office.core.KoikatsuCards.isCharacterCard(this,source)){
+                    !com.openlocal.office.core.KoikatsuCards.isCharacterCard(MainActivity.this,source)){
                     runOnUiThread(()->js("window.FileGestionerRemoteViewer.onOpen("+
                        q("{\"error\":\"The selected PNG is not a native Koikatsu card\"}")+")"));
                     return;
