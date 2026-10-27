@@ -84,7 +84,7 @@ public final class ReaderCovers {
         }
         if(isArchive(name)){
             try(BookArchive book=new BookArchive(ctx,uri,lower.endsWith(".epub"))){
-                if(book.imageCount()==0)return null;
+                if(!lower.endsWith(".epub")&&book.imageCount()==0)return null;
                 // EPUB: honor package cover metadata. ZIP/CBZ: use the first
                 // actual numbered image, not an arbitrary filename farther in.
                 String candidate=book.preferredCover();
