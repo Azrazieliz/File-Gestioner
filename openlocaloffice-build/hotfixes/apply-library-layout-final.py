@@ -57,5 +57,14 @@ css+="""
  .fg-library-root .fg-lib-body{padding-left:10px!important;padding-right:10px!important}
 }
 """
+css+="""
+.fg-lib-cover-request{
+ position:absolute;left:8px;right:8px;bottom:33px;z-index:2;
+ padding:6px 4px;min-height:29px;border-radius:8px;
+ background:#243451e8;color:#e8efff;border:1px solid #ffffff33;
+ font:600 11px system-ui;cursor:pointer;touch-action:manipulation;
+}
+.fg-lib-cover-request:active{background:#394b73}
+"""
 s.write_text(css)
 print("Library uses safe system insets, compact uncluttered header and compact mobile covers")
