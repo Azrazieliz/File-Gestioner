@@ -56,7 +56,11 @@ public final class BookArchive implements Closeable {
         SeekableZip opened=null;
         ParcelFileDescriptor spoolHandle=null;
         try {
+            long providerStart=android.os.SystemClock.elapsedRealtime();
             handle=context.getContentResolver().openFileDescriptor(uri,"r");
+            android.util.Log.i("FG_PERF","SAF_OPEN_ms="+
+                (android.os.SystemClock.elapsedRealtime()-providerStart)+
+                " authority="+uri.getAuthority());
             if(handle==null)throw new IOException("Cannot read this document provider");
             long advertised=providerLength();
             long physical=handle.getStatSize();
@@ -71,7 +75,10 @@ public final class BookArchive implements Closeable {
                 // Read ZIP central directory directly from the SAF descriptor.
                 // Unlike ZipFile("/proc/self/fd/NN"), this does not reopen
                 // provider-owned FDs and does not download/copy them a second time.
+                long indexStart=android.os.SystemClock.elapsedRealtime();
                 opened=new SeekableZip(handle);
+                android.util.Log.i("FG_PERF","ZIP_INDEX_ms="+
+                    (android.os.SystemClock.elapsedRealtime()-indexStart));
             } catch(IOException indexError) {
                 boolean seekable;
                 try{Os.lseek(handle.getFileDescriptor(),0L,OsConstants.SEEK_CUR);seekable=true;}
@@ -83,6 +90,7 @@ public final class BookArchive implements Closeable {
                 if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create temporary reading cache");
                 temp=File.createTempFile("book-",".zip",dir);
                 long copied=0L;
+                long spoolStart=android.os.SystemClock.elapsedRealtime();
                 try(InputStream input=context.getContentResolver().openInputStream(uri);
                     OutputStream output=new BufferedOutputStream(new FileOutputStream(temp),128*1024)){
                     if(input==null)throw new IOException("The cloud provider has no readable stream");
@@ -91,6 +99,9 @@ public final class BookArchive implements Closeable {
                         output.write(buffer,0,n);copied+=n;
                     }
                 }
+                android.util.Log.i("FG_PERF","CLOUD_SPOOL_ms="+
+                    (android.os.SystemClock.elapsedRealtime()-spoolStart)+
+                    " bytes="+copied);
                 if(advertised>0&&copied!=advertised)
                     throw new IOException("Cloud transfer incomplete: received "+copied+" / "+advertised+" bytes.");
                 spoolHandle=ParcelFileDescriptor.open(temp,ParcelFileDescriptor.MODE_READ_ONLY);
