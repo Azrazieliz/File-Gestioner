@@ -43,8 +43,9 @@ public final class ReaderCovers {
         String key=hash(source.toString()+"|"+size+"|"+lastModified);
         File cached=new File(dir,key+".jpg");
         if(cached.exists()&&cached.length()>0)return new FileInputStream(cached);
-        if(isExpensiveCloudCover(source,name))
-            throw new IOException("Remote archive covers load after the book is cached locally");
+        if(isExpensiveCloudCover(source,name)&&
+            !RemoteBookSpool.hasCompleted(ctx,source,size))
+            throw new IOException("Remote archive cover deferred until the book is locally cached");
         boolean acquired=false;
         try {
             WORKERS.acquire();
