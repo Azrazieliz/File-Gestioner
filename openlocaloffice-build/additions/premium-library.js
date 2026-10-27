@@ -93,7 +93,7 @@ function card(item,i){
  fallback.append(E('span','fg-lib-fallback-glyph',icon(c)),
                  E('strong','fg-lib-fallback-title',item.title));
  cover.appendChild(fallback);
- if(item.cover&&!item.folder){
+ if(item.cover){
    const image=E('img','fg-lib-cover-image');
    image.loading='lazy';image.decoding='async';
    image.alt='Cover · '+item.title;
@@ -237,9 +237,14 @@ window.FileGestionerLibrary={
    currentFolder='';stack=[];show();
  },missingCollection:showEmpty
 };
-document.addEventListener('DOMContentLoaded',()=>{
- // The native app never forces a folder selection; all providers remain opt-in.
+const initializeLibrary=()=>{
+ // Handle both early page loads and scripts loaded after DOMContentLoaded.
+ if(window.__fgLibraryInitialized)return;
+ window.__fgLibraryInitialized=true;
  show();
  bridge()?.readerDiagnostic?.('LIBRARY_READY');
-});
+};
+if(document.readyState==='loading')
+ document.addEventListener('DOMContentLoaded',initializeLibrary,{once:true});
+else initializeLibrary();
 })();
