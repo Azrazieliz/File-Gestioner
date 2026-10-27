@@ -50,7 +50,7 @@ function initialize(){
  // native kinetic scrolling, long swipes and scroll chaining keep working.
  // Only a genuine two-finger gesture is handled by JavaScript for pinch zoom.
  const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
- const point=t=>({x:t.clientX,y:t.clientY});
+ const point=t=>({clientX:t.clientX,clientY:t.clientY});
  scroll.addEventListener('touchstart',e=>{
    if(e.touches.length===2){
      const [x,y]=e.touches;
