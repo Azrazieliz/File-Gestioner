@@ -16,7 +16,7 @@ need(book.includes('META-INF/container.xml'),'Must locate EPUB package through c
 need(book.includes('get("idref")')===false&&book.includes('field(item,"idref")'),
      'Spine items need idref lookup');
 need(book.includes('new SeekableZip(handle)'),'Must index seekable SAF ZIP without reopening or copying file');
-need(book.includes('RemoteBookSpool.obtain(context,uri,advertised)')&&
+need(book.includes('RemoteBookSpool.obtain(context,uri,advertised,preview)')&&
      spool.includes('BufferedOutputStream(')&&spool.includes('new FileOutputStream(pending)'),
      'Nonseekable provider must use a reusable, serialized disk spool');
 need(spool.includes('synchronized(lock)')&&spool.includes('CLOUD_SPOOL_CACHE_HIT'),
