@@ -31,6 +31,14 @@ public final class RemoteBookSpool {
             throw new IllegalStateException("Cannot hash archive cache identity",e);
         }
     }
+    /** A cached archive may be indexed for thumbnails without another download. */
+    public static boolean hasCompleted(Context ctx,Uri uri,long expected) {
+        if(uri==null)return false;
+        File ready=new File(new File(ctx.getCacheDir(),"reading-v2"),
+            identity(uri,expected)+".zip");
+        return ready.isFile()&&ready.length()>0&&
+            (expected<0||ready.length()==expected);
+    }
     /** Blocks concurrent requests for this exact source until a single complete
      * copy is available. Retains successful copies across reader sessions.
      */
