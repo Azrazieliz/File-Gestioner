@@ -54,6 +54,51 @@ public final class ReaderLibrary {
         }
         return new Listing(id,array);
     }
+    /** Lazy folder cover: first naturally sorted visible image, without reading image bytes. */
+    public static Uri firstImage(Context ctx,Uri directory) throws Exception {
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(
+            directory,DocumentsContract.getDocumentId(directory));
+        Uri tree=directory;
+        String[] cols={DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE};
+        String bestId=null,bestName=null;
+        try(Cursor cursor=ctx.getContentResolver().query(children,cols,null,null,null)){
+            if(cursor==null)return null;
+            int scanned=0;
+            while(cursor.moveToNext()&&scanned++<2000){
+                String id=cursor.getString(0),name=cursor.getString(1),mime=cursor.getString(2);
+                if(id==null||name==null||mime==null)continue;
+                String low=name.toLowerCase(Locale.ROOT);
+                if(name.startsWith(".")||low.startsWith("._")||
+                   !(low.endsWith(".jpg")||low.endsWith(".jpeg")||
+                     low.endsWith(".png")||low.endsWith(".webp")))continue;
+                if(bestName==null||naturalCompare(name,bestName)<0){
+                    bestName=name;bestId=id;
+                }
+            }
+        }
+        return bestId==null?null:DocumentsContract.buildDocumentUriUsingTree(tree,bestId);
+    }
+    private static int naturalCompare(String a,String b){
+        int i=0,j=0;
+        while(i<a.length()&&j<b.length()){
+            char x=a.charAt(i),y=b.charAt(j);
+            if(Character.isDigit(x)&&Character.isDigit(y)){
+                int startI=i,startJ=j;
+                while(i<a.length()&&Character.isDigit(a.charAt(i)))i++;
+                while(j<b.length()&&Character.isDigit(b.charAt(j)))j++;
+                String n=a.substring(startI,i).replaceFirst("^0+(?!$)","");
+                String m=b.substring(startJ,j).replaceFirst("^0+(?!$)","");
+                if(n.length()!=m.length())return Integer.compare(n.length(),m.length());
+                int c=n.compareTo(m);if(c!=0)return c;
+            }else{
+                int c=Character.compare(Character.toLowerCase(x),Character.toLowerCase(y));
+                if(c!=0)return c;i++;j++;
+            }
+        }
+        return Integer.compare(a.length(),b.length());
+    }
     private static boolean supported(String filename){
         for(String suffix:new String[]{
             ".zip",".cbz",".cbr",".epub",".pdf",".docx",".doc",
