@@ -102,6 +102,7 @@ jobs:
           python3 ../hotfixes/apply-premium-v13-reader.py
           python3 ../hotfixes/apply-navigation-back.py
           python3 ../hotfixes/apply-seamless-webtoon.py
+          python3 ../hotfixes/apply-gesture-first-reader.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
