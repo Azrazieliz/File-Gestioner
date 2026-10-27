@@ -124,6 +124,17 @@ function open(nextKind='cube'){
 window.FileGestionerRemoteViewer={open,onOpen,close};
 const entry=el('button','fg-pc-entry','PC 3D');
 entry.type='button';entry.setAttribute('aria-label','Open independent native Blender cube on PC');
-entry.onclick=()=>open('cube');
+let entryKind='cube';
+entry.onclick=()=>open(entryKind);
+const originalLoad=window.loadDocument;
+if(typeof originalLoad==='function'){
+  window.loadDocument=function(documentInfo){
+    entryKind=documentInfo?.koikatsuCard===true?'koikatsu':
+      documentInfo?.type==='model3d'&&['blend','blend1'].includes(documentInfo?.format)?'blend':'cube';
+    entry.textContent=entryKind==='koikatsu'?'Koikatsu 3D':
+      entryKind==='blend'?'Blender PC':'PC 3D';
+    return originalLoad.apply(this,arguments);
+  };
+}
 document.body.append(entry);
 })();
