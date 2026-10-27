@@ -117,6 +117,13 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
                     libraryCovers.put(id,new LibraryCover(
                         file,item.optString("name"),item.optLong("size",-1),
                         item.optLong("modified",0),item.optBoolean("folder")));
+                    // Prevent background downloads of cloud archives for thumbnails.
+                    String coverName=item.optBoolean("folder")?
+                        "folder-cover.jpg":item.optString("name");
+                    boolean safeCover=!ReaderCovers.isExpensiveCloudCover(file,coverName)
+                        ||ReaderCovers.hasCached(MainActivity.this,file,
+                            item.optLong("size",-1),item.optLong("modified",0));
+                    if(safeCover)
                     item.put("cover","https://fg-assets.invalid/cover/"+id);
                 }
                 String json=new org.json.JSONObject()
