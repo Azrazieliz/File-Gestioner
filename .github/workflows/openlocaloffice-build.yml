@@ -127,6 +127,7 @@ jobs:
           node --check app/src/main/assets/universal-reader.js
           node --check app/src/main/assets/unified-viewer-controls.js
           node ../hotfixes/test-continuous-reader.cjs
+          node ../hotfixes/test-seamless-webtoon.cjs
           node --check app/src/main/assets/unified-viewer-controls.js
           node ../hotfixes/test-unified-reader.cjs
           node --check app/src/main/assets/epub-reader.js
