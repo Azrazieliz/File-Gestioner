@@ -110,6 +110,8 @@ jobs:
           python3 ../hotfixes/apply-device-ux-20261027.py
           cp ../pc-remote/fg-remote-ui.js app/src/main/assets/fg-remote-ui.js
           python3 ../hotfixes/apply-native-pc-remote.py
+          cp ../hotfixes/fg-early-page.js app/src/main/assets/fg-early-page.js
+          python3 ../hotfixes/apply-early-reader-preview.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
