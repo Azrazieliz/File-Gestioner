@@ -112,19 +112,18 @@ function card(item,i){
    image.loading='lazy';image.decoding='async';
    image.alt='Cover · '+item.title;
    image.addEventListener('load',()=>{cover.classList.add('fg-lib-has-image');});
-   image.addEventListener('error',()=>{image.remove();});
+   image.addEventListener('error',()=>{if(!item.remoteCover)image.remove();});
    cover.appendChild(image);
    if(item.remoteCover){
      // A TeraBox thumbnail can require reading 12 MiB of a ZIP.
      // Never launch 5-50 competing cloud downloads while browsing files.
-     const load=b('Get cover','fg-lib-cover-request',e=>{});
-     load.setAttribute('aria-label','Load cloud cover for '+item.title);
-     load.addEventListener('click',ev=>{
+     const load=b('Get cover','fg-lib-cover-request',ev=>{
        ev.stopPropagation();ev.preventDefault();
        if(load.dataset.started)return;
        load.dataset.started='true';load.textContent='Loading…';
        fetchCoverSequentially(image,item.cover,load);
      });
+     load.setAttribute('aria-label','Load cloud cover for '+item.title);
      cover.append(load);
    }else image.src=item.cover;
  }
