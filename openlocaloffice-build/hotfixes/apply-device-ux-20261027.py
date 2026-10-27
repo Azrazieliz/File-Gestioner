@@ -98,6 +98,35 @@ document.body.appendChild(chromeToggle);
 """+anchor)
 p.write_text(s)
 
+# The spreadsheet mutation observer must never flip an actively edited cell
+# back to contentEditable=false while typing. This was the reason edits stopped.
+app=assets/"app.js"
+s=app.read_text()
+old="cells().forEach(prep);let sh=sheet();"
+assert old in s,"Spreadsheet input synchronization anchor missing"
+s=s.replace(old,"cells().forEach(td=>{if(td.contentEditable==='true'&&document.activeElement===td)return;prep(td)});let sh=sheet();")
+old="$('sheetUndo').onclick=undo;"
+assert old in s
+extra="""// Explicit phone edit/save affordances; never rely on difficult double-tap.
+const quick=T.querySelector('.sheetQuickActions');
+if(quick){
+ const editButton=document.createElement('button');
+ editButton.type='button';editButton.textContent='Edit';
+ editButton.title='Edit selected cell';
+ editButton.id='sheetEditAction';
+ editButton.onclick=()=>edit(at(S.active)||cells()[0]);
+ quick.prepend(editButton);
+ const saveCopyButton=document.createElement('button');
+ saveCopyButton.type='button';saveCopyButton.textContent='Save copy';
+ saveCopyButton.title='Save changed spreadsheet as a new document';
+ saveCopyButton.id='sheetSaveCopyAction';
+ saveCopyButton.onclick=()=>document.getElementById('copyBtn')?.click();
+ quick.appendChild(saveCopyButton);
+}
+"""
+s=s.replace(old,extra+old)
+app.write_text(s)
+
 css=assets/"style.css"
 css.write_text(css.read_text()+r'''
 /* Real finger-driven pinch/scroll for comic ZIPs and standalone images.
