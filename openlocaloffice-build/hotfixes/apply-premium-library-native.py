@@ -18,9 +18,9 @@ once('    private String imageStreamToken;', '''
     private final java.util.Set<String> allowedLibraryUris=
         java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final class LibraryCover {
-        final Uri uri; final String name; final long size,modified;
-        LibraryCover(Uri uri,String name,long size,long modified){
-            this.uri=uri;this.name=name;this.size=size;this.modified=modified;
+        final Uri uri; final String name; final long size,modified; final boolean folder;
+        LibraryCover(Uri uri,String name,long size,long modified,boolean folder){
+            this.uri=uri;this.name=name;this.size=size;this.modified=modified;this.folder=folder;
         }
     }
 ''')
@@ -37,7 +37,7 @@ once('''                    String assetPath=u.getPath();
                             new ByteArrayInputStream(new byte[0]));
                         try{
                             return new WebResourceResponse("image/jpeg",null,
-                                ReaderCovers.open(MainActivity.this,ref.uri,ref.name,ref.size,ref.modified));
+                                ReaderCovers.open(MainActivity.this,ref.folder?ReaderLibrary.firstImage(MainActivity.this,ref.uri):ref.uri,ref.folder?"folder-cover.jpg":ref.name,ref.size,ref.modified));
                         }catch(Exception ignored){
                             return new WebResourceResponse("image/jpeg",null,
                                 new ByteArrayInputStream(new byte[0]));
@@ -103,13 +103,13 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
                 org.json.JSONArray items=listing.items;
                 for(int i=0;i<items.length();i++){
                     org.json.JSONObject item=items.getJSONObject(i);
-                    if(item.optBoolean("folder"))continue;
+                    // Folder covers resolved only when their thumbnails are requested.
                     String id=java.util.UUID.randomUUID().toString().replace("-","");
                     Uri file=Uri.parse(item.getString("uri"));
                     allowedLibraryUris.add(file.toString());
                     libraryCovers.put(id,new LibraryCover(
                         file,item.optString("name"),item.optLong("size",-1),
-                        item.optLong("modified",0)));
+                        item.optLong("modified",0),item.optBoolean("folder")));
                     item.put("cover","https://fg-assets.invalid/cover/"+id);
                 }
                 String json=new org.json.JSONObject()
