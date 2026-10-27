@@ -38,8 +38,17 @@ once('''                    String assetPath=u.getPath();
                         if(ref==null)return new WebResourceResponse("image/jpeg",null,
                             new ByteArrayInputStream(new byte[0]));
                         try{
+                            ReaderLibrary.CoverCandidate first=ref.folder?
+                                ReaderLibrary.firstCover(MainActivity.this,ref.uri):null;
+                            if(ref.folder&&first==null)
+                                throw new java.io.IOException("No supported first book or image");
+                            Uri coverSource=ref.folder?first.uri:ref.uri;
+                            String coverName=ref.folder?first.name:ref.name;
+                            long coverSize=ref.folder?first.size:ref.size;
+                            long coverModified=ref.folder?first.modified:ref.modified;
                             return new WebResourceResponse("image/jpeg",null,
-                                ReaderCovers.open(MainActivity.this,ref.folder?ReaderLibrary.firstImage(MainActivity.this,ref.uri):ref.uri,ref.folder?"folder-cover.jpg":ref.name,ref.size,ref.modified));
+                                ReaderCovers.open(MainActivity.this,coverSource,
+                                    coverName,coverSize,coverModified));
                         }catch(Exception ignored){
                             return new WebResourceResponse("image/jpeg",null,
                                 new ByteArrayInputStream(new byte[0]));
