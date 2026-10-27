@@ -120,12 +120,15 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
                     // Prevent background downloads of cloud archives for thumbnails.
                     String coverName=item.optBoolean("folder")?
                         "folder-cover.jpg":item.optString("name");
-                    boolean safeCover=!ReaderCovers.isExpensiveCloudCover(file,coverName)
-                        ||ReaderCovers.hasCached(MainActivity.this,file,
-                            item.optLong("size",-1),item.optLong("modified",0))
-                        ||(!item.optBoolean("folder")&&
-                            RemoteBookSpool.hasCompleted(MainActivity.this,file,
-                                item.optLong("size",-1)));
+                    // WebView lazy-loads only on-screen covers. Cloud archive
+                    // requests now scan a bounded ZIP prefix, never spool whole
+                    // remote books. Cached complete books are served locally.
+                    String lower=coverName.toLowerCase(java.util.Locale.ROOT);
+                    boolean safeCover=item.optBoolean("folder")||
+                        lower.endsWith(".epub")||lower.endsWith(".cbz")||
+                        lower.endsWith(".zip")||lower.endsWith(".pdf")||
+                        lower.endsWith(".jpg")||lower.endsWith(".jpeg")||
+                        lower.endsWith(".png")||lower.endsWith(".webp");
                     if(safeCover)
                     item.put("cover","https://fg-assets.invalid/cover/"+id);
                 }
