@@ -108,6 +108,7 @@ html.write_text(s)
 css=root/"assets/style.css"
 css.write_text(css.read_text()+r'''
 /* Native PC 3D is independent of the offline 3D mesh viewer. */
+.fg-pc-entry[hidden]{display:none!important}
 .fg-pc-entry{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));
  right:15px;z-index:97;background:#506ce3;color:#fff;
  border:1px solid #7389ef;border-radius:13px;padding:12px;font:700 14px system-ui}
