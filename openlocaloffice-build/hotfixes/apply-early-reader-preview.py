@@ -14,7 +14,8 @@ s=s.replace(a,'''    private volatile String fgEarlyToken;
 '''+a,1)
 a="                    String assetPath=u.getPath();"
 assert s.count(a)==1,"WebView resource handler absent"
-s=s.replace(a,a+"""                    if(assetPath!=null&&assetPath.startsWith("/early/")){
+s=s.replace(a,a+"""
+                    if(assetPath!=null&&assetPath.startsWith("/early/")){
                         String suffix=assetPath.substring("/early/".length());
                         int split=suffix.indexOf('/');
                         if(split>0&&suffix.substring(0,split).equals(fgEarlyToken)){
@@ -30,7 +31,7 @@ s=s.replace(a,a+"""                    if(assetPath!=null&&assetPath.startsWith(
                         }
                         return new WebResourceResponse("image/jpeg",null,
                             new ByteArrayInputStream(new byte[0]));
-                    }""",1
+                    }""",1)
 a="BookArchive candidate=new BookArchive(this,uri,false);"
 assert s.count(a)==1,"ZIP book creation anchor missing"
 new="""final String progressiveSession=java.util.UUID.randomUUID().toString();
