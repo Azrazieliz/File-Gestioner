@@ -7,35 +7,10 @@ u=assets/"unified-viewer-controls.js"
 s=u.read_text()
 assert "const minScale=.65,maxScale=4;" in s
 s=s.replace("const minScale=.65,maxScale=4;","const minScale=1,maxScale=4;")
-s=s.replace("let scale=1,disposed=false,pinch=null,lastTap=0,lastPosition=null;",
-            "let scale=1,disposed=false,pinch=null,lastTap=0,lastPosition=null,oneFinger=null;")
+# Native WebView must own single-finger scroll and fling; never intercept it.
+# The existing unified viewer only calls preventDefault for two-finger pinch.
 s=s.replace("target.style.width=Math.round(value*100)+'%';",
             "target.style.setProperty('width',Math.round(value*100)+'%','important');")
-a="  const begin=e=>{\n    if(e.touches.length!==2)return;"
-assert a in s
-s=s.replace(a,"""  const begin=e=>{
-    if(e.touches.length===1&&['comic','image'].includes(kind)){
-      const t=e.touches[0];oneFinger={x:t.clientX,y:t.clientY};return;
-    }
-    oneFinger=null;
-    if(e.touches.length!==2)return;""")
-a="  const move=e=>{\n    if(!pinch||e.touches.length!==2)return;"
-assert a in s
-s=s.replace(a,"""  const move=e=>{
-    if(e.touches.length===1&&oneFinger&&['comic','image'].includes(kind)){
-      if(e.cancelable!==false)e.preventDefault();
-      const t=e.touches[0];
-      scroller.scrollLeft+=oneFinger.x-t.clientX;
-      scroller.scrollTop+=oneFinger.y-t.clientY;
-      oneFinger={x:t.clientX,y:t.clientY};
-      return;
-    }
-    if(!pinch||e.touches.length!==2)return;""")
-a="  const end=e=>{\n    if(pinch){"
-assert a in s
-s=s.replace(a,"  const end=e=>{\n    oneFinger=null;\n    if(pinch){")
-s=s.replace("scroller.addEventListener('touchcancel',()=>{pinch=null;},{passive:true});",
-            "scroller.addEventListener('touchcancel',()=>{pinch=null;oneFinger=null;},{passive:true});")
 u.write_text(s)
 
 p=assets/"universal-reader.js"
@@ -140,11 +115,12 @@ app.write_text(s)
 
 css=assets/"style.css"
 css.write_text(css.read_text()+r'''
-/* Real finger-driven pinch/scroll for comic ZIPs and standalone images.
-   Android WebView cannot steal the two-finger gesture to pan the page. */
+/* Native Android WebView handles single-finger scroll/fling for comics and images.
+   Pinch zoom is handled separately by two-finger touch listeners. */
 .fg-archive-scroll.fg-unified-scroll:has(.fg-comic-stack),
 .fg-unified-image-scroll.fg-unified-scroll{
- touch-action:none!important;
+ touch-action:pan-x pan-y!important;
+ -webkit-overflow-scrolling:touch;
  overscroll-behavior:contain;
 }
 .fg-comic-stack .fg-comic-section{margin:0!important;padding:0!important;box-shadow:none!important;border:0!important}
