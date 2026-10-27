@@ -91,26 +91,12 @@ public final class BookArchive implements Closeable {
                 catch(Exception notSeekable){seekable=false;}
                 if(seekable)throw new IOException(
                     "Unable to read ZIP index directly. The archive may be incomplete or damaged.",indexError);
-                // Only pipe-only sources require ONE persistent disk spool.
-                File dir=new File(context.getCacheDir(),"reading");
-                if(!dir.exists()&&!dir.mkdirs())throw new IOException("Cannot create temporary reading cache");
-                temp=File.createTempFile("book-",".zip",dir);
-                long copied=0L;
-                long spoolStart=android.os.SystemClock.elapsedRealtime();
-                try(InputStream input=context.getContentResolver().openInputStream(uri);
-                    OutputStream output=new BufferedOutputStream(new FileOutputStream(temp),128*1024)){
-                    if(input==null)throw new IOException("The cloud provider has no readable stream");
-                    byte[] buffer=new byte[128*1024];int n;
-                    while((n=input.read(buffer))!=-1){
-                        output.write(buffer,0,n);copied+=n;
-                    }
-                }
-                android.util.Log.i("FG_PERF","CLOUD_SPOOL_ms="+
-                    (android.os.SystemClock.elapsedRealtime()-spoolStart)+
-                    " bytes="+copied);
-                if(advertised>0&&copied!=advertised)
-                    throw new IOException("Cloud transfer incomplete: received "+copied+" / "+advertised+" bytes.");
-                spoolHandle=ParcelFileDescriptor.open(temp,ParcelFileDescriptor.MODE_READ_ONLY);
+                // A pipe-only cloud source requires a disk copy for ZIP random
+                // access. Share one completed copy across readers and prevent
+                // concurrent downloads of the same cloud book.
+                File completed=RemoteBookSpool.obtain(context,uri,advertised);
+                spoolHandle=ParcelFileDescriptor.open(completed,
+                    ParcelFileDescriptor.MODE_READ_ONLY);
                 opened=new SeekableZip(spoolHandle);
             }
             zip=opened;
