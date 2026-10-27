@@ -50,7 +50,8 @@ public final class ReaderCovers {
             if(cached.exists()&&cached.length()>0)return new FileInputStream(cached);
             // For pipe-only TeraBox streams, extracting a thumbnail from a
             // 2GiB remote ZIP would copy the *entire* file. Skip it instead.
-            if(isArchive(name)&&size>64L*1024*1024&&!seekable(ctx,source))
+            if(isArchive(name)&&size>64L*1024*1024&&
+               !isExpensiveCloudCover(source,name)&&!seekable(ctx,source))
                 throw new IOException("Cloud archive needs a local/seekable copy before cover preview");
             Bitmap bitmap=isExpensiveCloudCover(source,name)&&isArchive(name)?
                 decodeCloudArchiveCover(ctx,source,size):decode(ctx,source,name);
@@ -109,7 +110,7 @@ public final class ReaderCovers {
                 throw new IOException("Cached cloud cover could not be decoded",error);
             }
         }
-        final long limit=12L*1024*1024;
+        final long limit=4L*1024*1024;
         try(InputStream network=ctx.getContentResolver().openInputStream(uri)){
             if(network==null)return null;
             InputStream bounded=new java.io.FilterInputStream(network){
@@ -146,7 +147,7 @@ public final class ReaderCovers {
                 }
             }
         }catch(IOException notAvailable){
-            android.util.Log.i("FG_COVER","No cover in first 12 MiB of cloud ZIP: "+
+            android.util.Log.i("FG_COVER","No cover in first 4 MiB of cloud ZIP: "+
                 notAvailable.getMessage());
         }
         return null;
