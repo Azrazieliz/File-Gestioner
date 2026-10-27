@@ -122,7 +122,10 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
                         "folder-cover.jpg":item.optString("name");
                     boolean safeCover=!ReaderCovers.isExpensiveCloudCover(file,coverName)
                         ||ReaderCovers.hasCached(MainActivity.this,file,
-                            item.optLong("size",-1),item.optLong("modified",0));
+                            item.optLong("size",-1),item.optLong("modified",0))
+                        ||(!item.optBoolean("folder")&&
+                            RemoteBookSpool.hasCompleted(MainActivity.this,file,
+                                item.optLong("size",-1)));
                     if(safeCover)
                     item.put("cover","https://fg-assets.invalid/cover/"+id);
                 }
