@@ -19,6 +19,23 @@ import java.util.concurrent.Semaphore;
 public final class ReaderCovers {
     private static final Semaphore WORKERS=new Semaphore(2);
     private ReaderCovers(){}
+    /** A Round Sync SAF archive descriptor may be a pipe; even a 4 MB CBZ
+     * caused an entire remote transfer just to discover its first image.
+     * Keep already generated local cover cache, but never initiate a cloud
+     * archive transfer in the background on the library screen. */
+    public static boolean isExpensiveCloudCover(Uri uri,String name){
+        if(uri==null||name==null)return false;
+        String authority=uri.getAuthority();
+        if(authority==null)return false;
+        return "de.felixnuesse.extract.vcp".equals(authority) &&
+            (isArchive(name)||"folder-cover.jpg".equals(name));
+    }
+    public static boolean hasCached(Context ctx,Uri uri,long size,long modified){
+        if(uri==null)return false;
+        File file=new File(new File(ctx.getCacheDir(),"covers-v2"),
+            hash(uri.toString()+"|"+size+"|"+modified)+".jpg");
+        return file.isFile()&&file.length()>0;
+    }
     public static InputStream open(Context ctx,Uri source,String name,
                                    long size,long lastModified) throws IOException {
         File dir=new File(ctx.getCacheDir(),"covers-v2");
@@ -26,6 +43,9 @@ public final class ReaderCovers {
         String key=hash(source.toString()+"|"+size+"|"+lastModified);
         File cached=new File(dir,key+".jpg");
         if(cached.exists()&&cached.length()>0)return new FileInputStream(cached);
+        if(isExpensiveCloudCover(source,name)&&
+            !RemoteBookSpool.hasCompleted(ctx,source,size))
+            throw new IOException("Remote archive cover deferred until the book is locally cached");
         boolean acquired=false;
         try {
             WORKERS.acquire();
@@ -84,7 +104,7 @@ public final class ReaderCovers {
         }
         if(isArchive(name)){
             try(BookArchive book=new BookArchive(ctx,uri,lower.endsWith(".epub"))){
-                if(book.imageCount()==0)return null;
+                if(!lower.endsWith(".epub")&&book.imageCount()==0)return null;
                 // EPUB: honor package cover metadata. ZIP/CBZ: use the first
                 // actual numbered image, not an arbitrary filename farther in.
                 String candidate=book.preferredCover();
