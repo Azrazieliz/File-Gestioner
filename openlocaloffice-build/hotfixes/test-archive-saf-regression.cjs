@@ -32,4 +32,8 @@ need(!m.includes('remember(temp'),'Temporary cache is not a persistent document 
 const names=['Book/10.webp','Book/2.webp','Book/1.webp'];
 names.sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
 assert.deepEqual(names,['Book/1.webp','Book/2.webp','Book/10.webp']);
+need(b.includes('if(isReadablePage(name))archiveImages.add(name)'),
+  'macOS metadata and dotfiles cannot become comic/image pages');
+need(b.includes('segment.equalsIgnoreCase("__MACOSX")'),
+  'Do not render ZIP Finder resource forks as blank pages');
 console.log('PASS: Comic ZIP auto-detection, numerical image order, CBZ zoom, SAF direct-source and expiry policies.');
