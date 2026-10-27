@@ -132,11 +132,23 @@ class Handler(BaseHTTPRequestHandler):
             studio_ws({"type":"camera","command":"setview",
                 "pos":[float(math.sin(yaw)*distance),1.25+pitch,float(math.cos(yaw)*distance)],
                 "rot":[float(-pitch*45),float(yaw*180/math.pi),0],"fov":35})
-            data=studio_ws({"type":"screenshot","width":680,"height":800,
-                "transparency":False,"mark":False}).get("data",{})
-            raw=base64.b64decode(data.get("image",""))
-            if not raw.startswith(b"\x89PNG"):raise RuntimeError("Native Studio sent no 3D screenshot")
-            return self.reply(200,raw,"image/png")
+            with RENDER_LOCK:
+                output=ROOT/"native-frame.png"
+                errors=ROOT/"native-frame.error"
+                for path in (output,errors):
+                    if path.exists():path.unlink()
+                (ROOT/"native-frame.request").write_text("680,800",encoding="ascii")
+                deadline=time.monotonic()+35
+                while time.monotonic()<deadline:
+                    if errors.exists():
+                        raise RuntimeError("Native offscreen capture: "+errors.read_text()[:450])
+                    if output.exists() and output.stat().st_size>200:
+                        raw=output.read_bytes()
+                        if not raw.startswith(b"\x89PNG"):
+                            raise RuntimeError("Offscreen capture was not a PNG")
+                        return self.reply(200,raw,"image/png")
+                    time.sleep(.1)
+                raise RuntimeError("Native Unity offscreen capture timed out; Studio may not be fully initialized")
         name=f"{sid}_{yaw:.2f}_{pitch:.2f}_{distance:.2f}.jpg"
         destination=ROOT/"frames"/name
         destination.parent.mkdir(exist_ok=True)
