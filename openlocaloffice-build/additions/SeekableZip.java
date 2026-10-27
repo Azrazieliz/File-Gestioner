@@ -119,7 +119,7 @@ public final class SeekableZip implements Closeable {
             if(next>endAt||next<0)throw new IOException("ZIP index member exceeds directory");
             byte[] nameBytes=Arrays.copyOfRange(directory,p+46,p+46+nameLength);
             String name=new String(nameBytes,(flags&0x800)!=0?StandardCharsets.UTF_8:CP437);
-            if(name.indexOf('\\0')>=0||name.contains("\\\\")||name.startsWith("/")||
+            if(name.indexOf('\0')>=0||name.contains("\\")||name.startsWith("/")||
                name.equals("..")||name.startsWith("../")||name.contains("/../"))
                 throw new IOException("Invalid archive path");
             if(packed==0xffffffffL||unpacked==0xffffffffL||local==0xffffffffL){
