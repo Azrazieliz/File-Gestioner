@@ -31,7 +31,7 @@ for obj in meshes:
 center=sum(points,Vector((0,0,0)))/len(points)
 extent=max(max((p-center).length for p in points),0.1)
 scene=bpy.context.scene
-scene.render.engine="BLENDER_EEVEE_NEXT"
+scene.render.engine="BLENDER_EEVEE"
 scene.render.resolution_x=680
 scene.render.resolution_y=800
 scene.render.resolution_percentage=100
