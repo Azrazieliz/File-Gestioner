@@ -6,7 +6,7 @@ p=Path("app/build.gradle.kts")
 s=p.read_text()
 target=r'(applicationId\s*=\s*"com\.openlocal\.office")'
 s,n=re.subn(target,lambda m:m.group(1)+
-    '\n        applicationIdSuffix = ".repaired"\n        versionNameSuffix = "-repaired"',s,count=1)
+    '\n        applicationIdSuffix = ".pc3d"\n        versionNameSuffix = "-pc3d"',s,count=1)
 assert n==1,"Android package ID could not be safely adjusted"
 p.write_text(s)
-print("Parallel safe preview package: com.openlocal.office.repaired")
+print("Parallel safe preview package: com.openlocal.office.pc3d")
