@@ -31,13 +31,16 @@ public final class RemoteBookSpool {
             throw new IllegalStateException("Cannot hash archive cache identity",e);
         }
     }
-    /** A cached archive may be indexed for thumbnails without another download. */
-    public static boolean hasCompleted(Context ctx,Uri uri,long expected) {
-        if(uri==null)return false;
+    /** A cached archive can be read locally without touching Round Sync. */
+    public static File completedFile(Context ctx,Uri uri,long expected){
+        if(uri==null)return null;
         File ready=new File(new File(ctx.getCacheDir(),"reading-v2"),
             identity(uri,expected)+".zip");
         return ready.isFile()&&ready.length()>0&&
-            (expected<0||ready.length()==expected);
+            (expected<0||ready.length()==expected)?ready:null;
+    }
+    public static boolean hasCompleted(Context ctx,Uri uri,long expected) {
+        return completedFile(ctx,uri,expected)!=null;
     }
     public interface PreviewListener {
         void onFirstPage(String name,byte[] image);
