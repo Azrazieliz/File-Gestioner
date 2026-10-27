@@ -36,13 +36,18 @@ callbackType=ctypes.WINFUNCTYPE(w.BOOL,w.HWND,w.LPARAM)
 user.GetWindowThreadProcessId.argtypes=[w.HWND,ctypes.POINTER(w.DWORD)]
 user.ShowWindow.argtypes=[w.HWND,ctypes.c_int]
 user.IsWindowVisible.argtypes=[w.HWND]
+user.SetWindowPos.argtypes=[w.HWND,w.HWND,ctypes.c_int,ctypes.c_int,
+                            ctypes.c_int,ctypes.c_int,w.UINT]
 while True:
     @callbackType
     def check(hwnd,lparam):
         owner=w.DWORD()
         user.GetWindowThreadProcessId(hwnd,ctypes.byref(owner))
         if owner.value==pid and user.IsWindowVisible(hwnd):
-            user.ShowWindow(hwnd,7) # SW_SHOWMINNOACTIVE
+            # Keep GPU renderable window mapped on the normal desktop, but
+            # place it far outside visible monitors without ever activating it.
+            user.ShowWindow(hwnd,8) # SW_SHOWNA
+            user.SetWindowPos(hwnd,1,-16000,-16000,854,480,0x0010|0x0040)
         return True
     user.EnumWindows(check,0)
     time.sleep(1)
