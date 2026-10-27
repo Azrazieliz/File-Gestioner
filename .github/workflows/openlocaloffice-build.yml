@@ -106,6 +106,7 @@ jobs:
           python3 ../hotfixes/apply-navigation-back.py
           python3 ../hotfixes/apply-seamless-webtoon.py
           python3 ../hotfixes/apply-gesture-first-reader.py
+          python3 ../hotfixes/apply-device-ux-20261027.py
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
@@ -281,6 +282,26 @@ jobs:
             --title "File Gestioner debug build ${{ github.run_number }}" \
             --notes "Development APK; Android device verification is required. Do not treat as stable." \
             --prerelease
+
+      - name: Build separate preview package without overwriting the installed app
+        working-directory: openlocaloffice-build/project
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/debug/app-debug.apk /tmp/file-gestioner-original.apk
+          python3 ../hotfixes/enable-side-by-side-preview.py
+          gradle assembleDebug --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk /tmp/app-preview-debug.apk
+          cp /tmp/file-gestioner-original.apk app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish preview APK for safe separate phone installation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="file-gestioner-debug-${{ github.run_number }}"
+          gh release upload "$tag" /tmp/app-preview-debug.apk --repo "${{ github.repository }}" --clobber
 
       - name: Enable emulator acceleration
         shell: bash
