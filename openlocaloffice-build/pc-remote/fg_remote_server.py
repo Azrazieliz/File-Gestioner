@@ -37,6 +37,7 @@ def is_koikatsu_card(payload):
 def studio_ws(data):
     # KKStudioSocket runs INSIDE native Koikatsu Studio and talks only to this
     # local process. Never forward the unsecured game WebSocket to the phone.
+    sys.path.insert(0,str(ROOT/"vendor"))
     import websocket
     conn=websocket.create_connection("ws://127.0.0.1:8765/ws",timeout=12)
     try:
