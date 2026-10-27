@@ -86,6 +86,7 @@ jobs:
           python3 ../hotfixes/apply-docx-flow-editor.py
           python3 ../hotfixes/apply-3d-asset-viewer.py
           python3 ../hotfixes/apply-continuous-reader-css.py
+          python3 ../hotfixes/apply-seamless-webtoon.py
           python3 ../hotfixes/apply-professional-pdf-ui.py
           cp ../additions/unified-viewer-controls.js app/src/main/assets/unified-viewer-controls.js
           python3 ../hotfixes/apply-unified-reader-experience.py
