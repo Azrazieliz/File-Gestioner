@@ -4,25 +4,17 @@ from pathlib import Path
 root=Path("app/src/main")
 main=root/"java/com/openlocal/office/MainActivity.java"
 s=main.read_text()
-a="""    private volatile byte[] fgEarlyPage;
-    private volatile String fgEarlyToken;
-    private volatile String fgEarlyMime="image/jpeg";
-"""
-assert s.count(a)==1, "Old one-page state changed"
-s=s.replace(a,"""    private volatile String fgEarlyToken;
+a="    private volatile Uri libraryTree;"
+assert s.count(a)==1,"Library field missing from assembled source"
+s=s.replace(a,'''    private volatile String fgEarlyToken;
     private final java.util.concurrent.ConcurrentHashMap<Integer,java.io.File>
         fgEarlyPages=new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.concurrent.ConcurrentHashMap<Integer,String>
         fgEarlyMimes=new java.util.concurrent.ConcurrentHashMap<>();
-""",1)
-a="""                    if(assetPath!=null&&assetPath.startsWith("/early/")&&
-                       assetPath.substring("/early/".length()).equals(fgEarlyToken)&&
-                       fgEarlyPage!=null){
-                        return new WebResourceResponse(fgEarlyMime,null,
-                            new ByteArrayInputStream(fgEarlyPage));
-                    }"""
-assert s.count(a)==1, "Old one-page WebView resource changed"
-s=s.replace(a,"""                    if(assetPath!=null&&assetPath.startsWith("/early/")){
+'''+a,1)
+a="                    String assetPath=u.getPath();"
+assert s.count(a)==1,"WebView resource handler absent"
+s=s.replace(a,a+"""                    if(assetPath!=null&&assetPath.startsWith("/early/")){
                         String suffix=assetPath.substring("/early/".length());
                         int split=suffix.indexOf('/');
                         if(split>0&&suffix.substring(0,split).equals(fgEarlyToken)){
@@ -38,27 +30,9 @@ s=s.replace(a,"""                    if(assetPath!=null&&assetPath.startsWith("/
                         }
                         return new WebResourceResponse("image/jpeg",null,
                             new ByteArrayInputStream(new byte[0]));
-                    }""",1)
-a="""BookArchive candidate=new BookArchive(this,uri,false,
-                        new RemoteBookSpool.PreviewListener(){
-                            public void onFirstPage(String filename,byte[] image){
-                                if(image==null||image.length==0)return;
-                                fgEarlyPage=image;
-                                fgEarlyToken=java.util.UUID.randomUUID().toString();
-                                String l=filename.toLowerCase(java.util.Locale.ROOT);
-                                fgEarlyMime=l.endsWith(".webp")?"image/webp":
-                                    l.endsWith(".png")?"image/png":"image/jpeg";
-                                String u="https://fg-assets.invalid/early/"+fgEarlyToken;
-                                runOnUiThread(()->js("window.FileGestionerEarly?.show("+
-                                    q(u)+","+q(filename)+")"));
-                                android.util.Log.i("FG_PERF","EARLY_PAGE_READY bytes="+image.length);
-                            }
-                            public void onProgress(long downloaded,long expected){
-                                runOnUiThread(()->js("window.FileGestionerEarly?.progress("+
-                                    downloaded+","+expected+")"));
-                            }
-                        });"""
-assert s.count(a)==1, "Old preview listener changed"
+                    }""",1
+a="BookArchive candidate=new BookArchive(this,uri,false);"
+assert s.count(a)==1,"ZIP book creation anchor missing"
 new="""final String progressiveSession=java.util.UUID.randomUUID().toString();
                     fgEarlyToken=progressiveSession;
                     fgEarlyPages.clear();
