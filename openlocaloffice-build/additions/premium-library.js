@@ -84,17 +84,28 @@ function openBook(item){
  document.getElementById('work')?.classList.remove('hidden');
  bridge()?.openLibraryFile?.(item.uri);
 }
+// Never start five remote archive transfers at once. Image requests run only
+// after the corresponding tile intersects the viewport; each finishes before
+// the next starts. Opening a book cancels the pending (not-yet-started) work.
 let coverQueue=Promise.resolve();
-function fetchCoverSequentially(image,url,button){
+const queuedCovers=new WeakSet();
+const coverObserver=window.IntersectionObserver?new IntersectionObserver(changes=>{
+ for(const item of changes){
+   if(!item.isIntersecting)continue;
+   coverObserver.unobserve(item.target);
+   item.target._fgStartCover?.();
+ }
+},{root:body,rootMargin:'0px'}):null;
+function loadRemoteCover(image,url,cover){
+ if(queuedCovers.has(image))return;
+ queuedCovers.add(image);
  coverQueue=coverQueue.catch(()=>{}).then(()=>new Promise(resolve=>{
-   if(!button.isConnected){resolve();return;}
-   const done=()=>{button.remove();resolve();};
-   image.addEventListener('load',done,{once:true});
-   image.addEventListener('error',()=>{
-     button.textContent='Unavailable';
-     button.dataset.started='';
-     resolve();
-   },{once:true});
+   if(!image.isConnected||!visible){resolve();return;}
+   const indicator=E('span','fg-lib-cover-loading','Loading cover…');
+   cover.appendChild(indicator);
+   const finish=()=>{indicator.remove();resolve();};
+   image.addEventListener('load',finish,{once:true});
+   image.addEventListener('error',finish,{once:true});
    image.src=url;
  }));
 }
@@ -115,16 +126,10 @@ function card(item,i){
    image.addEventListener('error',()=>{if(!item.remoteCover)image.remove();});
    cover.appendChild(image);
    if(item.remoteCover){
-     // A TeraBox thumbnail can require reading 12 MiB of a ZIP.
-     // Never launch 5-50 competing cloud downloads while browsing files.
-     const load=b('Get cover','fg-lib-cover-request',ev=>{
-       ev.stopPropagation();ev.preventDefault();
-       if(load.dataset.started)return;
-       load.dataset.started='true';load.textContent='Loading…';
-       fetchCoverSequentially(image,item.cover,load);
-     });
-     load.setAttribute('aria-label','Load cloud cover for '+item.title);
-     cover.append(load);
+     // Automatic, sequential, visibility-prioritized cloud thumbnail loading.
+     cover._fgStartCover=()=>loadRemoteCover(image,item.cover,cover);
+     if(coverObserver)coverObserver.observe(cover);
+     else cover._fgStartCover();
    }else image.src=item.cover;
  }
  const badge=E('span','fg-lib-type',label(item));
