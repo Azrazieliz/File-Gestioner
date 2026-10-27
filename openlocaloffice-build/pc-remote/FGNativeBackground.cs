@@ -12,8 +12,8 @@ namespace FileGestioner.NativeRemote
     public sealed class NativeBackground : BaseUnityPlugin
     {
         private readonly string folder=Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".file-gestioner","native-3d");
+            Path.Combine(Environment.GetEnvironmentVariable("USERPROFILE"),".file-gestioner"),
+            "native-3d");
         private string requestPath;
         private string framePath;
         private string errorPath;
