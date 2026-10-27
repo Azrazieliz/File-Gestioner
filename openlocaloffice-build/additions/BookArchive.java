@@ -48,6 +48,10 @@ public final class BookArchive implements Closeable {
     }
 
     public BookArchive(Context ctx,Uri source,boolean epub) throws Exception {
+        this(ctx,source,epub,null);
+    }
+    public BookArchive(Context ctx,Uri source,boolean epub,
+                       RemoteBookSpool.PreviewListener preview) throws Exception {
         context=ctx.getApplicationContext();
         uri=source;
         token=UUID.randomUUID().toString();
@@ -94,7 +98,7 @@ public final class BookArchive implements Closeable {
                 // A pipe-only cloud source requires a disk copy for ZIP random
                 // access. Share one completed copy across readers and prevent
                 // concurrent downloads of the same cloud book.
-                File completed=RemoteBookSpool.obtain(context,uri,advertised);
+                File completed=RemoteBookSpool.obtain(context,uri,advertised,preview);
                 spoolHandle=ParcelFileDescriptor.open(completed,
                     ParcelFileDescriptor.MODE_READ_ONLY);
                 opened=new SeekableZip(spoolHandle);
