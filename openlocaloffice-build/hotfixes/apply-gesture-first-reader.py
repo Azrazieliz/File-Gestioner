@@ -4,8 +4,11 @@ root=Path("app/src/main/assets")
 reader=root/"universal-reader.js"
 s=reader.read_text()
 old=""" tools.append(pageLabel,progress,minus,percent,plus,fit);"""
-assert old in s
-s=s.replace(old," tools.append(pageLabel,progress);")
+if old in s:
+    s=s.replace(old," tools.append(pageLabel,progress);")
+else:
+    import re
+    s=re.sub(r"tools\.append\(pageLabel,\s*progress(?:,\s*minus,\s*percent,\s*plus,\s*fit)?\);", "tools.append(pageLabel,progress);", s)
 s=s.replace("changeZoom(scale>=1.8?1:2,v.clientX-rect.left,v.clientY-rect.top)","changeZoom(1,v.clientX-rect.left,v.clientY-rect.top)")
 s=s.replace("changeZoom(scale>=1.8?1:2,e.clientX-rect.left,e.clientY-rect.top)","changeZoom(1,e.clientX-rect.left,e.clientY-rect.top)")
 # New document and image always open fitted; saved zoom must not override base fit.
