@@ -2,13 +2,13 @@
 (()=>{
 'use strict';
 let surface=null,scroll=null,stack=null,status=null,readFull=null;
-let pages=0,scale=1,complete=false,points=new Map(),pinchStart=0;
+let pages=0,scale=1,complete=false,pinch=null,tapStart=null;
 let lastTap=0,lastPos=null;
 function setStatus(value){if(status)status.textContent=value;}
 function hide(){
  if(surface)surface.remove();
  surface=null;scroll=null;stack=null;status=null;readFull=null;
- pages=0;scale=1;complete=false;points.clear();pinchStart=0;
+ pages=0;scale=1;complete=false;pinch=null;tapStart=null;
 }
 function readFullBook(){
  if(!complete)return;
@@ -46,45 +46,45 @@ function initialize(){
  readFull.type='button';readFull.hidden=true;
  readFull.addEventListener('click',readFullBook);
  foot.append(status,readFull,library);surface.append(foot);
- scroll.addEventListener('pointerdown',e=>{
-   scroll.setPointerCapture(e.pointerId);
-   points.set(e.pointerId,{x:e.clientX,y:e.clientY});
-   if(points.size===2){
-     const a=[...points.values()];
-     pinchStart=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
+ // Leave one-finger swipes entirely to the Android WebView scroll engine:
+ // native kinetic scrolling, long swipes and scroll chaining keep working.
+ // Only a genuine two-finger gesture is handled by JavaScript for pinch zoom.
+ const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+ const point=t=>({x:t.clientX,y:t.clientY});
+ scroll.addEventListener('touchstart',e=>{
+   if(e.touches.length===2){
+     const [x,y]=e.touches;
+     pinch={distance:Math.max(1,distance(x,y)),scale};
+     tapStart=null;
+   }else if(e.touches.length===1&& !pinch){
+     tapStart=point(e.touches[0]);
    }
- });
- scroll.addEventListener('pointermove',e=>{
-   if(!points.has(e.pointerId))return;
-   const before=points.get(e.pointerId);
-   points.set(e.pointerId,{x:e.clientX,y:e.clientY});
-   if(points.size===2){
-     const a=[...points.values()];
-     const span=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);
-     if(pinchStart>0){
-       scale=Math.max(1,Math.min(4,scale*span/pinchStart));
-       stack.style.width=Math.round(scale*100)+'%';
-     }
-     pinchStart=span;
-   }else{
-     scroll.scrollTop+=before.y-e.clientY;
-     if(scale>1)scroll.scrollLeft+=before.x-e.clientX;
+ },{passive:true});
+ scroll.addEventListener('touchmove',e=>{
+   if(!pinch||e.touches.length!==2)return;
+   if(e.cancelable)e.preventDefault();
+   const [x,y]=e.touches;
+   scale=Math.max(1,Math.min(4,pinch.scale*distance(x,y)/pinch.distance));
+   stack.style.width=Math.round(scale*100)+'%';
+   tapStart=null;
+ },{passive:false});
+ scroll.addEventListener('touchend',e=>{
+   if(pinch){
+     if(e.touches.length<2)pinch=null;
+     tapStart=null;
+     return;
    }
- });
- const up=e=>{
-   const pos=points.get(e.pointerId);
-   points.delete(e.pointerId);
-   if(points.size<2)pinchStart=0;
-   if(!pos)return;
-   const dist=Math.hypot(pos.x-e.clientX,pos.y-e.clientY);
-   const now=Date.now();
-   if(dist<18&&now-lastTap<350&&lastPos&&
-       Math.hypot(lastPos.x-e.clientX,lastPos.y-e.clientY)<52){
-     scale=1;stack.style.width='100%';scroll.scrollLeft=0;lastTap=0;
-   }else if(dist<18){lastTap=now;lastPos={x:e.clientX,y:e.clientY};}
- };
- scroll.addEventListener('pointerup',up);
- scroll.addEventListener('pointercancel',up);
+   if(!tapStart||e.touches.length||e.changedTouches.length!==1)return;
+   const p=e.changedTouches[0],now=Date.now();
+   const moved=distance(tapStart,p);
+   tapStart=null;
+   if(moved>14){lastTap=0;return;}
+   if(now-lastTap<330&&lastPos&&distance(lastPos,p)<52){
+     scale=1;stack.style.width='100%';scroll.scrollLeft=0;
+     lastTap=0;lastPos=null;
+   }else{lastTap=now;lastPos=point(p);}
+ },{passive:true});
+ scroll.addEventListener('touchcancel',()=>{pinch=null;tapStart=null;lastTap=0;},{passive:true});
  document.body.append(surface);
  window.AndroidBridge?.setReadingImmersive?.(true);
 }
@@ -128,7 +128,7 @@ window.addEventListener('pagehide',hide);
 const style=document.createElement('style');
 style.textContent=[
 '.fg-progressive-comic{position:fixed;inset:0;z-index:9900;background:#090c12;color:#dfeaff;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px)}',
-'.fg-progressive-scroll{flex:1;min-height:0;overflow:auto;touch-action:none;overscroll-behavior:contain}',
+'.fg-progressive-scroll{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;overscroll-behavior:contain}',
 '.fg-progressive-pages{width:100%;margin:0;padding:0;line-height:0}',
 '.fg-progressive-page{display:block;width:100%;margin:0;padding:0;border:0;line-height:0;min-height:0}',
 '.fg-progressive-page img{display:block;width:100%;height:auto;margin:0;padding:0;border:0;box-shadow:none;vertical-align:top}',
