@@ -13,6 +13,8 @@ once('    private static final int REQ_SAVE_COPY = 1002;',
 once('    private String imageStreamToken;', '''
     private String imageStreamToken;
     private volatile Uri libraryTree;
+    private final java.util.concurrent.ExecutorService collectionIo=
+        java.util.concurrent.Executors.newSingleThreadExecutor();
     private final java.util.concurrent.ConcurrentHashMap<String,LibraryCover> libraryCovers=
         new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Set<String> allowedLibraryUris=
@@ -96,9 +98,14 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
         final Uri root=libraryTree;
         if(root==null){runOnUiThread(()->
             js("window.FileGestionerLibrary?.missingCollection()"));return;}
-        io.execute(()->{
+        // Do not queue a document open behind a slow Round Sync cloud query.
+        collectionIo.execute(()->{
             try{
+                long started=android.os.SystemClock.elapsedRealtime();
                 ReaderLibrary.Listing listing=ReaderLibrary.list(this,root,folder);
+                android.util.Log.i("FG_PERF","COLLECTION_LIST_ms="+
+                    (android.os.SystemClock.elapsedRealtime()-started)+
+                    " items="+listing.items.length());
                 libraryCovers.clear();allowedLibraryUris.clear();
                 org.json.JSONArray items=listing.items;
                 for(int i=0;i<items.length();i++){
