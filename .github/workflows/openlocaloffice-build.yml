@@ -92,6 +92,7 @@ jobs:
           python3 ../hotfixes/apply-professional-pdf-ui.py
           cp ../additions/unified-viewer-controls.js app/src/main/assets/unified-viewer-controls.js
           python3 ../hotfixes/apply-unified-reader-experience.py
+          cp ../additions/RemoteBookSpool.java app/src/main/java/com/openlocal/office/core/RemoteBookSpool.java
           cp ../additions/BookArchive.java app/src/main/java/com/openlocal/office/core/BookArchive.java
           cp ../additions/SeekableZip.java app/src/main/java/com/openlocal/office/core/SeekableZip.java
           cp ../additions/StreamedText.java app/src/main/java/com/openlocal/office/core/StreamedText.java
