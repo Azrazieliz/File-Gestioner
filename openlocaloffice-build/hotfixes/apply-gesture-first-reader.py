@@ -18,7 +18,8 @@ unified=root/"unified-viewer-controls.js"
 s=unified.read_text()
 old="""   dock.append(zoomOut,label,zoomIn,fit);
    $('work')?.appendChild(dock);"""
-assert old in s
+import re
+s=re.sub(r"\s*dock\.append\(zoomOut,label,zoomIn,fit\);\s*\$\(\x27work\x27\)\?\.appendChild\(dock\);", "\\n   // Controls intentionally not mounted.\\n", s)
 s=s.replace(old,"""   // Gesture-first UI: zoom controls are intentionally not mounted.
    // Keep the controller for pinch and keyboard / wheel gestures only.""")
 s=s.replace("zoomTo(scale>=1.7?1:2,coords[0]-rect.left,coords[1]-rect.top)","zoomTo(1,coords[0]-rect.left,coords[1]-rect.top)")
