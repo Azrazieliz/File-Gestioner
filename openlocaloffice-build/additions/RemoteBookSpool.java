@@ -44,6 +44,7 @@ public final class RemoteBookSpool {
     }
     public interface PreviewListener {
         void onFirstPage(String name,byte[] image);
+        default void onPage(String name,byte[] image){onFirstPage(name,image);}
         void onProgress(long transferred,long expected);
     }
     /** Blocks concurrent requests for this exact source until a single complete
@@ -99,43 +100,38 @@ public final class RemoteBookSpool {
                         return n;
                     }
                 };
-                // A genuine CBZ/ZIP is a sequential stream of local file
-                // records before its central index. Extract one small page
-                // while copying (zero additional provider downloads), so the
-                // phone can display it immediately rather than wait for the
-                // full remote archive to arrive.
+                // Pages are extracted in local-header order AS the same cloud
+                // stream is cached. Publish each completed page immediately.
+                // The provider is opened exactly once; there is no second
+                // network request for page 2, 3, ... or the cover.
                 if(preview!=null){
-                    try{
+                    try {
                         java.util.zip.ZipInputStream zip=new java.util.zip.ZipInputStream(tee);
                         byte[] readBuffer=new byte[64*1024];
-                        long inspected=0;
-                        for(int i=0;i<24&&inspected<32L*1024*1024;i++){
-                            java.util.zip.ZipEntry entry=zip.getNextEntry();
-                            if(entry==null)break;
-                            String name=entry.getName();
-                            String low=name.toLowerCase(java.util.Locale.ROOT);
+                        java.util.zip.ZipEntry entry;
+                        int entries=0;
+                        while((entry=zip.getNextEntry())!=null){
+                            if(++entries>150000)throw new IOException("Excessive ZIP entries");
+                            String name=entry.getName(),low=name.toLowerCase(Locale.ROOT);
                             boolean image=!entry.isDirectory()&&!name.startsWith(".")&&
                                 !low.contains("__macosx")&&!low.contains("/._")&&
                                 (low.endsWith(".png")||low.endsWith(".jpg")||
                                  low.endsWith(".jpeg")||low.endsWith(".webp"));
                             java.io.ByteArrayOutputStream page=image?
-                                new java.io.ByteArrayOutputStream():null;
+                                new java.io.ByteArrayOutputStream(128*1024):null;
                             int n;
                             while((n=zip.read(readBuffer))!=-1){
-                                inspected+=n;
                                 if(page!=null){
-                                    if(page.size()+n>8*1024*1024)page=null;
+                                    if(page.size()+n>16*1024*1024)page=null;
                                     else page.write(readBuffer,0,n);
                                 }
-                                if(inspected>32L*1024*1024)break;
                             }
-                            if(page!=null&&page.size()>100){
-                                preview.onFirstPage(name,page.toByteArray());
-                                break;
-                            }
+                            if(page!=null&&page.size()>100)
+                                preview.onPage(name,page.toByteArray());
+                            zip.closeEntry();
                         }
                     }catch(Exception e){
-                        Log.w("FG_PERF","Early ZIP page unavailable; continuing normal spool",e);
+                        Log.w("FG_PERF","Progressive ZIP decoding stopped; finish download",e);
                     }
                 }
                 byte[] buffer=new byte[128*1024];
