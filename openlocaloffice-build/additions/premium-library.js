@@ -237,9 +237,14 @@ window.FileGestionerLibrary={
    currentFolder='';stack=[];show();
  },missingCollection:showEmpty
 };
-document.addEventListener('DOMContentLoaded',()=>{
- // The native app never forces a folder selection; all providers remain opt-in.
+const initializeLibrary=()=>{
+ // Handle both early page loads and scripts loaded after DOMContentLoaded.
+ if(window.__fgLibraryInitialized)return;
+ window.__fgLibraryInitialized=true;
  show();
  bridge()?.readerDiagnostic?.('LIBRARY_READY');
-});
+};
+if(document.readyState==='loading')
+ document.addEventListener('DOMContentLoaded',initializeLibrary,{once:true});
+else initializeLibrary();
 })();
