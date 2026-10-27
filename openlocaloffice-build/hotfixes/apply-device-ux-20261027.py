@@ -102,6 +102,13 @@ p.write_text(s)
 # back to contentEditable=false while typing. This was the reason edits stopped.
 app=assets/"app.js"
 s=app.read_text()
+# Fix a malformed comma-expression that made visible() throw whenever a sheet
+# contained cells, aborting selection, tap-to-edit and formula interaction.
+bad="if(!x.length)return null,rs=x.map(e=>+e.dataset.r),cs=x.map(e=>+e.dataset.c);return{"
+good="if(!x.length)return null;const rs=x.map(e=>+e.dataset.r),cs=x.map(e=>+e.dataset.c);return{"
+assert bad in s,"Spreadsheet visible-range parser bug anchor missing"
+s=s.replace(bad,good)
+
 old="cells().forEach(prep);let sh=sheet();"
 assert old in s,"Spreadsheet input synchronization anchor missing"
 s=s.replace(old,"cells().forEach(td=>{if(td.contentEditable==='true'&&document.activeElement===td)return;prep(td)});let sh=sheet();")
