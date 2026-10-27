@@ -138,8 +138,19 @@ once('''    private void openUri(Uri uri) {''','''    private void selectLibrary
                         lower.endsWith(".zip")||lower.endsWith(".pdf")||
                         lower.endsWith(".jpg")||lower.endsWith(".jpeg")||
                         lower.endsWith(".png")||lower.endsWith(".webp");
-                    if(safeCover)
-                    item.put("cover","https://fg-assets.invalid/cover/"+id);
+                    if(safeCover){
+                        item.put("cover","https://fg-assets.invalid/cover/"+id);
+                        // Remote folders and compressed books require network
+                        // transfers: only fetch covers after an explicit tap.
+                        boolean cloud="de.felixnuesse.extract.vcp".equals(file.getAuthority());
+                        boolean archive=lower.endsWith(".epub")||lower.endsWith(".zip")||
+                            lower.endsWith(".cbz")||item.optBoolean("folder");
+                        boolean knownCached=ReaderCovers.hasCached(MainActivity.this,file,
+                            item.optLong("size",-1),item.optLong("modified",0))||
+                            RemoteBookSpool.hasCompleted(MainActivity.this,file,
+                                item.optLong("size",-1));
+                        item.put("remoteCover",cloud&&archive&&!knownCached);
+                    }
                 }
                 String json=new org.json.JSONObject()
                     .put("folder",listing.folder).put("items",items).toString();
