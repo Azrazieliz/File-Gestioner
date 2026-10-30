@@ -9,7 +9,6 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
-import androidx.annotation.NonNull;
 import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
@@ -84,8 +83,8 @@ public final class FgMediaPlayer implements AutoCloseable {
             @Override public void onRenderedFirstFrame(){
                 Log.i("FG_MEDIA","VIDEO_FIRST_FRAME "+filename);
             }
-            @Override public void onPlayerError(@NonNull PlaybackException error){
-                Log.e("FG_MEDIA","PLAYBACK_ERROR code="+error.errorCodeName,error);
+            @Override public void onPlayerError(PlaybackException error){
+                Log.e("FG_MEDIA","PLAYBACK_ERROR code="+error.getErrorCodeName(),error);
                 if(!fallbackStarted){
                     fallbackStarted=true;
                     copyThenPlay();
