@@ -245,7 +245,13 @@ function showEmpty(){
 }
 function enterFolder(id){
  const entry=entries.find(x=>x.folder&&x.id===id);
- if(!entry)return;
+ if(!entry){error('Could not open folder');return;}
+ // If the directory contains no images, show its regular file listing
+ // instead of leaving a hidden library and an empty reader.
+ root.classList.remove('fg-lib-hidden');
+ visible=true;
+ document.getElementById('home')?.classList.add('hidden');
+ document.getElementById('work')?.classList.add('hidden');
  stack.push(currentFolder);currentFolder=id;request();
 }
 function openSibling(direction){
