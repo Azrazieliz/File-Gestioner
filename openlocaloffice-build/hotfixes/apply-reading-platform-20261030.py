@@ -104,7 +104,7 @@ methods=r'''    private volatile String fgFolderToken;
         }
         js("window.FileGestionerLibrary?.show()");
     }
-    @JavascriptInterface public void openImageFolder(String uriText){
+    private void openFolderImages(String uriText){
         if(uriText==null||!allowedLibraryUris.contains(uriText))return;
         final Uri directory=Uri.parse(uriText);
         collectionIo.execute(()->{
@@ -173,10 +173,11 @@ s=s.replace(anchor,methods+anchor,1)
 anchor='''                String quickType = detectType(uri, name);'''
 assert s.count(anchor)==1,"File detection anchor changed"
 s=s.replace(anchor,anchor+'''
-                if("mp3".equals(quickType)||"mp4".equals(quickType)||
-                   "m4a".equals(quickType)||"webm".equals(quickType)){
-                    final boolean isVideo="mp4".equals(quickType)||
-                        "webm".equals(quickType);
+                String lowerMediaName=name.toLowerCase(java.util.Locale.ROOT);
+                if(lowerMediaName.endsWith(".mp3")||lowerMediaName.endsWith(".mp4")||
+                   lowerMediaName.endsWith(".m4a")||lowerMediaName.endsWith(".webm")){
+                    final boolean isVideo=lowerMediaName.endsWith(".mp4")||
+                        lowerMediaName.endsWith(".webm");
                     runOnUiThread(()->showFgMedia(uri,name,isVideo));
                     return;
                 }''',1)
@@ -210,6 +211,13 @@ resource=r'''                    if(assetPath!=null&&assetPath.startsWith("/fold
                     }
 '''
 s=s.replace(anchor,resource+anchor,1)
+# Methods exposed to WebView must reside in the existing JavaScript bridge.
+bridge_anchor="        @JavascriptInterface public void openKoikatsu3d(){"
+assert s.count(bridge_anchor)==1
+s=s.replace(bridge_anchor,'''        @JavascriptInterface public void openImageFolder(String uri){
+            MainActivity.this.openFolderImages(uri);
+        }
+'''+bridge_anchor,1)
 # VideoView uses the same Activity and its native playback lifecycle.
 destroy='''    @Override public void onDestroy() {'''
 assert s.count(destroy)==1
