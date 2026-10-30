@@ -13,6 +13,7 @@ import androidx.media3.common.MediaItem;
 import androidx.media3.common.PlaybackException;
 import androidx.media3.common.Player;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.source.ProgressiveMediaSource;
 import androidx.media3.ui.PlayerView;
 import java.io.*;
 import java.security.MessageDigest;
@@ -34,6 +35,7 @@ public final class FgMediaPlayer implements AutoCloseable {
     private volatile boolean closed;
     private volatile boolean fallbackStarted;
     private volatile int session=1;
+    private volatile FgGrowingMediaDataSource.Progress growing;
     private Uri original;
     private String filename;
     private boolean video;
@@ -123,61 +125,103 @@ public final class FgMediaPlayer implements AutoCloseable {
             return text.toString();
         }catch(Exception e){throw new IllegalStateException(e);}
     }
+    /** MP4s with a fast-start index can begin once the first bytes arrive.
+     * Do not wait for an entire multi-GB remote movie. An MP4 with its
+     * moov index at the end still requires seekable provider or later bytes.
+     */
     private void copyThenPlay(){
         final int version=session;
-        showMessage("This file provider cannot stream the video. Caching for playback…");
+        showMessage("Connecting to video stream…");
         io.execute(()->{
-            File pending=null;
+            FgGrowingMediaDataSource.Progress progress=null;
             try{
                 File cacheDir=new File(activity.getExternalCacheDir()!=null?
-                    activity.getExternalCacheDir():activity.getCacheDir(),"fg-media-v1");
+                    activity.getExternalCacheDir():activity.getCacheDir(),"fg-media-v2");
                 if(!cacheDir.exists()&&!cacheDir.mkdirs())
-                    throw new IOException("No media cache directory");
+                    throw new IOException("Media cache directory is not available");
                 String low=filename.toLowerCase(Locale.ROOT);
                 String extension=low.endsWith(".webm")?".webm":
                     low.endsWith(".m4a")?".m4a":low.endsWith(".mp3")?".mp3":".mp4";
                 File ready=new File(cacheDir,digest(original)+extension);
-                if(ready.isFile()&&ready.length()>0){
+                File complete=new File(cacheDir,digest(original)+".complete");
+                if(ready.isFile()&&ready.length()>0&&complete.isFile()){
                     if(!closed&&version==session)
                         activity.runOnUiThread(()->play(Uri.fromFile(ready)));
                     return;
                 }
-                pending=new File(cacheDir,digest(original)+".part");
-                long written=0,lastDisplay=0;
+                // Only this file's incomplete cache is cleared; no app data
+                // or other downloaded media are deleted.
+                if(complete.exists())complete.delete();
+                if(ready.exists()&&!ready.delete())
+                    throw new IOException("Cannot reset partial media cache");
+                if(!ready.createNewFile())throw new IOException("Cannot create media cache");
+                progress=new FgGrowingMediaDataSource.Progress(ready);
+                growing=progress;
+                final FgGrowingMediaDataSource.Progress state=progress;
+                // Start ExoPlayer immediately. Its decoder will block only
+                // when it asks for bytes not yet received from the provider.
+                activity.runOnUiThread(()->{
+                    if(closed||version!=session)return;
+                    try{
+                        androidx.media3.datasource.DataSource.Factory factory=
+                            ()->new FgGrowingMediaDataSource(state);
+                        player.setMediaSource(new ProgressiveMediaSource.Factory(factory)
+                            .createMediaSource(MediaItem.fromUri(Uri.fromFile(ready))));
+                        player.prepare();player.play();
+                        Log.i("FG_MEDIA","PROGRESSIVE_PLAYBACK_START "+filename);
+                    }catch(Exception e){
+                        Log.e("FG_MEDIA","PROGRESSIVE_PREPARE_FAILED",e);
+                        showMessage("Video cannot start: "+e.getMessage());
+                    }
+                });
+                long written=0,reported=0;
                 try(InputStream in=activity.getContentResolver().openInputStream(original);
-                    OutputStream out=new BufferedOutputStream(new FileOutputStream(pending))){
+                    FileOutputStream out=new FileOutputStream(ready)){
                     if(in==null)throw new IOException("Media provider returned no stream");
-                    byte[] buffer=new byte[256*1024];
+                    byte[] buffer=new byte[128*1024];
                     int n;
                     while((n=in.read(buffer))!=-1){
-                        if(closed||version!=session)throw new IOException("Playback cancelled");
+                        if(closed||version!=session)
+                            throw new IOException("Playback cancelled");
                         out.write(buffer,0,n);
+                        // Flush each chunk before publishing its length to
+                        // readers that may be waiting at that offset.
+                        out.flush();
                         written+=n;
-                        if(written-lastDisplay>=4L*1024*1024){
-                            lastDisplay=written;
+                        state.available=written;
+                        state.wake();
+                        if(written-reported>=2L*1024*1024){
+                            reported=written;
                             final long copied=written;
-                            showMessage("Caching "+(copied/1048576)+" MB for playback…");
-                            StatFs fs=new StatFs(cacheDir.getAbsolutePath());
-                            if(fs.getAvailableBytes()<64L*1024*1024)
-                                throw new IOException("Insufficient storage for media cache");
+                            Log.i("FG_MEDIA","STREAM_BYTES_READY "+copied);
+                            showMessage("Streaming "+copied/1048576+" MB received…");
+                            StatFs stat=new StatFs(cacheDir.getAbsolutePath());
+                            if(stat.getAvailableBytes()<64L*1024*1024)
+                                throw new IOException("Not enough space to cache video");
                         }
                     }
                 }
-                if(written==0)throw new IOException("Media file is empty");
-                if(!pending.renameTo(ready))throw new IOException("Cache rename failed");
-                Log.i("FG_MEDIA","CACHED_MEDIA_READY bytes="+written);
-                if(!closed&&version==session)
-                    activity.runOnUiThread(()->play(Uri.fromFile(ready)));
+                if(written==0)throw new IOException("Video file is empty");
+                state.finished=true;state.wake();
+                try(FileOutputStream marker=new FileOutputStream(complete)){
+                    marker.write(Long.toString(written).getBytes(
+                        java.nio.charset.StandardCharsets.US_ASCII));
+                }
+                Log.i("FG_MEDIA","STREAM_DOWNLOAD_COMPLETE bytes="+written);
             }catch(Exception e){
-                Log.e("FG_MEDIA","CACHE_FALLBACK_ERROR",e);
+                Log.e("FG_MEDIA","VIDEO_STREAM_FAILED",e);
+                if(progress!=null){
+                    progress.failure=e instanceof IOException?(IOException)e:new IOException(e);
+                    progress.finished=true;progress.wake();
+                }
                 if(!closed&&version==session)
-                    showMessage("Playback unavailable: "+e.getMessage());
-                if(pending!=null)pending.delete();
+                    showMessage("Video stream failed: "+e.getMessage());
             }
         });
     }
     @Override public void close(){
         closed=true;session++;
+        if(growing!=null){growing.cancelled=true;growing.wake();}
         player.stop();player.release();
         io.shutdownNow();
     }
