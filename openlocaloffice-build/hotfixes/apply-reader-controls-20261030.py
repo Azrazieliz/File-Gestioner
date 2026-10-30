@@ -75,5 +75,21 @@ body.fg-folder-reading .bar{display:none!important}
  font-family:var(--fg-reader-font,Georgia,serif)!important;
  font-size:var(--fg-reader-size,19px)!important}
 """
+style+="""
+/* Large folders: only 96 document tiles render at a time. */
+.fg-lib-pager{display:flex;align-items:center;justify-content:center;
+ gap:7px;margin:12px 0 24px;grid-column:1/-1;font:600 12px system-ui;
+ color:#b7c7dd;flex-wrap:wrap}
+.fg-lib-page-control{background:#283a58;color:#eef5ff;
+ border:1px solid #455b7d;border-radius:9px;min-height:38px;
+ padding:7px 13px;font:600 12px system-ui}
+.fg-lib-page-control:disabled{opacity:.32}
+.fg-lib-page-number{background:#19253a;color:#eef5ff;
+ border:1px solid #50658a;border-radius:8px;width:56px;min-height:35px;
+ text-align:center;font:600 13px system-ui}
+.fg-folder-sentinel{display:flex;justify-content:center;align-items:center;
+ padding:12px 4px;color:#aebed8;background:#111722;
+ font:12px system-ui;min-height:32px;line-height:1.3}
+"""
 css.write_text(style)
 print("Shared reader dock + paged mode + colors/fonts + zoomable EPUB illustrations + image-folder layout enabled")
