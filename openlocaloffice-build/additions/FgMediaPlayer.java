@@ -93,7 +93,15 @@ public final class FgMediaPlayer implements AutoCloseable {
                 }else showMessage("Unable to decode or play this file: "+error.getMessage());
             }
         });
-        play(original);
+        // Round Sync's remote SAF documents generally expose a sequential
+        // pipe; its random seeks can hang while opening large MP4s. Start
+        // one progressive local stream immediately for that provider rather
+        // than waiting for the seek attempt to time out.
+        if("de.felixnuesse.extract.vcp".equals(original.getAuthority())){
+            fallbackStarted=true;
+            Log.i("FG_MEDIA","REMOTE_PIPE_PROGRESSIVE "+filename);
+            copyThenPlay();
+        }else play(original);
     }
     public View getView(){return root;}
     private void showMessage(String message){
