@@ -156,7 +156,11 @@ document.addEventListener('click',e=>{
 function renderImageFolder(data){
  const pages=Array.isArray(data.pages)?[...data.pages]:[];
  const editor=by('#editor');
- if(!editor)return;
+ if(!editor){
+   console.error('FG_FOLDER: missing document editor');
+   window.FileGestionerLibrary?.show?.();
+   return;
+ }
  document.body.classList.add('fg-folder-reading');
  const host=el('div','fg-folder-reader');
  const view=el('div','fg-folder-scroll');
@@ -228,8 +232,17 @@ function renderImageFolder(data){
 const upstream=window.loadDocument;
 window.loadDocument=function(data){
  reading=data;remove();
+ if(data?.type==='folderImages'){
+   // Existing generic loader has no "folderImages" type. Calling it first
+   // can throw or replace the editor after the folder image view was made.
+   document.getElementById('home')?.classList.add('hidden');
+   document.getElementById('work')?.classList.remove('hidden');
+   window.FileGestionerLibrary?.hideForReader?.();
+   renderImageFolder(data);
+   requestAnimationFrame(()=>requestAnimationFrame(attach));
+   return;
+ }
  const result=upstream.apply(this,arguments);
- if(data?.type==='folderImages')renderImageFolder(data);
  requestAnimationFrame(()=>requestAnimationFrame(attach));
  return result;
 };
