@@ -84,6 +84,31 @@ function openBook(item){
  document.getElementById('work')?.classList.remove('hidden');
  bridge()?.openLibraryFile?.(item.uri);
 }
+// Never start five remote archive transfers at once. Image requests run only
+// after the corresponding tile intersects the viewport; each finishes before
+// the next starts. Opening a book cancels the pending (not-yet-started) work.
+let coverQueue=Promise.resolve();
+const queuedCovers=new WeakSet();
+const coverObserver=window.IntersectionObserver?new IntersectionObserver(changes=>{
+ for(const item of changes){
+   if(!item.isIntersecting)continue;
+   coverObserver.unobserve(item.target);
+   item.target._fgStartCover?.();
+ }
+},{root:body,rootMargin:'0px'}):null;
+function loadRemoteCover(image,url,cover){
+ if(queuedCovers.has(image))return;
+ queuedCovers.add(image);
+ coverQueue=coverQueue.catch(()=>{}).then(()=>new Promise(resolve=>{
+   if(!image.isConnected||!visible){resolve();return;}
+   const indicator=E('span','fg-lib-cover-loading','Loading cover…');
+   cover.appendChild(indicator);
+   const finish=()=>{indicator.remove();resolve();};
+   image.addEventListener('load',finish,{once:true});
+   image.addEventListener('error',finish,{once:true});
+   image.src=url;
+ }));
+}
 function card(item,i){
  const c=classify(item),tile=E('article','fg-lib-tile fg-lib-'+c);
  tile.setAttribute('role','button');tile.setAttribute('tabindex','0');
@@ -93,14 +118,19 @@ function card(item,i){
  fallback.append(E('span','fg-lib-fallback-glyph',icon(c)),
                  E('strong','fg-lib-fallback-title',item.title));
  cover.appendChild(fallback);
- if(item.cover&&!item.folder){
+ if(item.cover){
    const image=E('img','fg-lib-cover-image');
    image.loading='lazy';image.decoding='async';
    image.alt='Cover · '+item.title;
    image.addEventListener('load',()=>{cover.classList.add('fg-lib-has-image');});
-   image.addEventListener('error',()=>{image.remove();});
-   image.src=item.cover;
+   image.addEventListener('error',()=>{if(!item.remoteCover)image.remove();});
    cover.appendChild(image);
+   if(item.remoteCover){
+     // Automatic, sequential, visibility-prioritized cloud thumbnail loading.
+     cover._fgStartCover=()=>loadRemoteCover(image,item.cover,cover);
+     if(coverObserver)coverObserver.observe(cover);
+     else cover._fgStartCover();
+   }else image.src=item.cover;
  }
  const badge=E('span','fg-lib-type',label(item));
  cover.appendChild(badge);
@@ -237,9 +267,14 @@ window.FileGestionerLibrary={
    currentFolder='';stack=[];show();
  },missingCollection:showEmpty
 };
-document.addEventListener('DOMContentLoaded',()=>{
- // The native app never forces a folder selection; all providers remain opt-in.
+const initializeLibrary=()=>{
+ // Handle both early page loads and scripts loaded after DOMContentLoaded.
+ if(window.__fgLibraryInitialized)return;
+ window.__fgLibraryInitialized=true;
  show();
  bridge()?.readerDiagnostic?.('LIBRARY_READY');
-});
+};
+if(document.readyState==='loading')
+ document.addEventListener('DOMContentLoaded',initializeLibrary,{once:true});
+else initializeLibrary();
 })();
