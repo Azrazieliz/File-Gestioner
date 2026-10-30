@@ -50,6 +50,8 @@ const categories=[
  ['document','Documents'],['model','3D assets']
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
+let activeVersion=null,scanning=false,pageStart=0,renderTimer=0;
+const PAGE=96;
 function classify(entry){
  if(entry.folder)return 'folder';
  const x=entry.name.toLowerCase();
@@ -148,8 +150,10 @@ function card(item,i){
  return tile;
 }
 function render(){
+ if(renderTimer){clearTimeout(renderTimer);renderTimer=0;}
  deck.className='fg-lib-grid'+(list?' fg-lib-list':'');
  deck.replaceChildren();empty.replaceChildren();
+ root.querySelectorAll('.fg-lib-pager').forEach(n=>n.remove());
  const needle=phrase.trim().toLocaleLowerCase();
  const shown=entries.filter(e=>{
    const c=classify(e);
@@ -159,10 +163,45 @@ function render(){
    if(a.folder!==b.folder)return a.folder?-1:1;
    return a.title.localeCompare(b.title,undefined,{numeric:true,sensitivity:'base'});
  });
+ const max=Math.max(0,shown.length-1);
+ pageStart=Math.min(pageStart,Math.floor(max/PAGE)*PAGE);
  const fragment=document.createDocumentFragment();
- shown.forEach((entry,i)=>fragment.appendChild(card(entry,i)));
+ shown.slice(pageStart,pageStart+PAGE).forEach((entry,i)=>
+   fragment.appendChild(card(entry,pageStart+i)));
  deck.appendChild(fragment);
- count.textContent=entries.length+' items';
+ const pages=Math.ceil(shown.length/PAGE);
+ const current=Math.floor(pageStart/PAGE)+1;
+ if(pages>1){
+   const nav=E('nav','fg-lib-pager');
+   const prev=b('‹ Previous','fg-lib-page-control',()=>{
+     pageStart=Math.max(0,pageStart-PAGE);render();body.scrollTop=0;
+   });
+   prev.disabled=pageStart<=0;
+   const forward=b('Next ›','fg-lib-page-control',()=>{
+     pageStart=Math.min((pages-1)*PAGE,pageStart+PAGE);render();body.scrollTop=0;
+   });
+   forward.disabled=pageStart+PAGE>=shown.length;
+   const input=E('input','fg-lib-page-number');
+   input.type='number';input.min='1';input.max=String(pages);input.value=String(current);
+   input.setAttribute('aria-label','Library page number');
+   input.onchange=()=>{
+     pageStart=Math.min((pages-1)*PAGE,
+       Math.max(0,(Math.round(Number(input.value)||1)-1)*PAGE));
+     render();body.scrollTop=0;
+   };
+   nav.append(prev,E('span','', 'Page '),input,
+     E('span','',' / '+pages),forward);
+   deck.after(nav);
+   if(current>1){
+     const earlier=nav.cloneNode(false);
+     earlier.className='fg-lib-pager';
+     earlier.append(E('span','', (pageStart+1)+'–'+Math.min(shown.length,pageStart+PAGE)+' of '+shown.length));
+     deck.before(earlier);
+   }
+ }
+ count.textContent=entries.length+(scanning?'+ scanned…':' items')+
+   ' · showing '+(shown.length?String(pageStart+1):'0')+
+   '–'+Math.min(shown.length,pageStart+PAGE);
  if(!shown.length){
    empty.append(E('div','fg-lib-empty-icon',entries.length?'⌕':'▤'),
      E('strong','',entries.length?'No matching titles':'Nothing in this collection yet'),
@@ -174,12 +213,13 @@ function createFilters(){
  filters.replaceChildren();
  for(const [key,name] of categories){
    const control=b(name,'fg-lib-filter'+(filter===key?' fg-lib-selected':''),
-     ()=>{filter=key;createFilters();render();});
+     ()=>{filter=key;pageStart=0;createFilters();render();});
    filters.append(control);
  }
 }
 function request(){
  if(!bridge()?.getLibraryRoot?.()){showEmpty();return;}
+ activeVersion=null;scanning=true;pageStart=0;entries=[];loaded=false;
  loading.classList.remove('fg-lib-hidden');deck.classList.add('fg-lib-hidden');
  empty.classList.add('fg-lib-hidden');
  bridge()?.listLibrary?.(currentFolder);
@@ -229,6 +269,20 @@ function show(){
  createFilters();
  request();
 }
+function append(payload){
+ if(!payload||!Array.isArray(payload.items))return;
+ if(activeVersion===null)activeVersion=payload.version;
+ if(payload.version!==activeVersion||payload.folder!==currentFolder)return;
+ entries.push(...payload.items);
+ scanning=!payload.finished;loaded=true;
+ loading.classList.add('fg-lib-hidden');deck.classList.remove('fg-lib-hidden');
+ empty.classList.remove('fg-lib-hidden');
+ heading.textContent=stack.length?'Collection':'Your library';
+ welcome.classList.add('fg-lib-hidden');toolbar.classList.remove('fg-lib-hidden');
+ filters.classList.remove('fg-lib-hidden');
+ if(renderTimer)clearTimeout(renderTimer);
+ renderTimer=setTimeout(render,70);
+}
 function receive(payload){
  loaded=true;
  entries=Array.isArray(payload.items)?payload.items:[];
@@ -246,7 +300,7 @@ function error(message){
                       E('p','',message||'Check cloud availability and file permissions'),
                       b('Try again','fg-lib-large-action',request));
 }
-search.addEventListener('input',()=>{phrase=search.value;render();});
+search.addEventListener('input',()=>{phrase=search.value;pageStart=0;render();});
 const homeNav=b('Library','fg-lib-top-link',show);
 homeNav.title='Open your library';
 document.querySelector('.bar .actions')?.prepend(homeNav);
@@ -282,7 +336,7 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,receive,error,handleBack:handleAndroidBack,enterFolder,openSibling,
+ show,receive,append,error,handleBack:handleAndroidBack,enterFolder,openSibling,
  isVisible:()=>visible,
  openCollection:()=>{
    currentFolder='';stack=[];show();
