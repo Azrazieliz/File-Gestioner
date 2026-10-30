@@ -217,6 +217,8 @@ function navigateBack(){
  show();
 }
 function show(){
+ window.FileGestionerReading?.close?.();
+ document.body.classList.remove('fg-folder-reading');
  visible=true;root.classList.remove('fg-lib-hidden');
  document.getElementById('home')?.classList.add('hidden');
  document.getElementById('work')?.classList.add('hidden');
