@@ -154,49 +154,75 @@ document.addEventListener('click',e=>{
  e.preventDefault();e.stopPropagation();zoomImage(img.currentSrc||img.src);
 },true);
 function renderImageFolder(data){
- const pages=Array.isArray(data.pages)?data.pages:[];
+ const pages=Array.isArray(data.pages)?[...data.pages]:[];
  const editor=by('#editor');
  if(!editor)return;
  document.body.classList.add('fg-folder-reading');
  const host=el('div','fg-folder-reader');
  const view=el('div','fg-folder-scroll');
  view.setAttribute('role','document');view.setAttribute('aria-label','Folder image reader');
- const stack=el('div','fg-folder-stack');view.append(stack);host.append(view);
+ const stack=el('div','fg-folder-stack');
+ const sentinel=el('div','fg-folder-sentinel');
+ sentinel.textContent='Loading next images…';
+ stack.append(sentinel);view.append(stack);host.append(view);
  editor.replaceChildren(host);
- for(const id of ['sheetBar','spreadsheetTools','textFormat','notice']){
+ for(const id of ['sheetBar','spreadsheetTools','textFormat','notice'])
   by('#'+id)?.classList.add('hidden');
- }
- let observer=null,index=0;
- const appendBatch=()=>{
-  if(!host.isConnected){observer?.disconnect();return;}
+ let imageObserver=null,batchObserver=null,index=0,finished=false,busy=false;
+ function appendBatch(){
+  if(!host.isConnected){imageObserver?.disconnect();batchObserver?.disconnect();return;}
+  if(busy||index>=pages.length)return;
+  busy=true;
   const frag=document.createDocumentFragment();
-  const end=Math.min(pages.length,index+100);
+  const end=Math.min(pages.length,index+48);
   while(index<end){
    const i=index++,page=pages[i];
    if(!page?.url)continue;
    const section=el('section','fg-folder-page');
-   section.dataset.page=String(i);
+   section.dataset.page=String(i+1);
    const image=el('img','fg-folder-image');
    image.alt=page.name||'Image '+i;image.loading='lazy';
    image.decoding='async';image.dataset.src=page.url;
    section.append(image);frag.append(section);
-   if(observer)observer.observe(image);
+   if(imageObserver)imageObserver.observe(image);
    else image.src=page.url;
   }
-  stack.append(frag);
-  if(index<pages.length)requestAnimationFrame(appendBatch);
-  else observer?.takeRecords();
- };
+  stack.insertBefore(frag,sentinel);
+  busy=false;
+  sentinel.textContent=finished?
+   (index<pages.length?'Continue reading…':'End of folder'):
+   (index<pages.length?'Continue reading…':'Receiving more images…');
+  // The sentinel observer adds the next batch when it enters the viewport.
+ }
  if(window.IntersectionObserver){
-  observer=new IntersectionObserver(records=>{
+  imageObserver=new IntersectionObserver(records=>{
    for(const record of records){
     if(!record.isIntersecting)continue;
-    const image=record.target;observer.unobserve(image);
-    if(image.dataset.src)image.src=image.dataset.src;
+    const img=record.target;imageObserver.unobserve(img);
+    if(img.dataset.src)img.src=img.dataset.src;
    }
-  },{root:view,rootMargin:'140% 0px',threshold:0});
+  },{root:view,rootMargin:'120% 0px',threshold:0});
+  batchObserver=new IntersectionObserver(records=>{
+   for(const r of records)if(r.isIntersecting)appendBatch();
+  },{root:view,rootMargin:'160% 0px',threshold:0});
+  batchObserver.observe(sentinel);
  }
- if(!pages.length)stack.append(el('p','fg-reader-empty','This folder has no readable images.'));
+ const add=incoming=>{
+  if(!host.isConnected)return;
+  if(!Array.isArray(incoming))return;
+  pages.push(...incoming);
+  if(index<pages.length&&
+     (index===0||sentinel.getBoundingClientRect().top<
+       view.getBoundingClientRect().bottom+view.clientHeight))
+    requestAnimationFrame(appendBatch);
+  sentinel.textContent='Receiving '+pages.length+' images…';
+ };
+ window.FileGestionerFolder={
+  append:payload=>add(payload?.pages),
+  done:total=>{finished=true;sentinel.textContent=
+   index<pages.length?'Continue reading…':'All '+total+' images received';},
+  count:()=>pages.length
+ };
  appendBatch();
 }
 const upstream=window.loadDocument;
