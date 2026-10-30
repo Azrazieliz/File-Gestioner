@@ -113,6 +113,13 @@ jobs:
           cp ../hotfixes/fg-early-page.js app/src/main/assets/fg-early-page.js
           python3 ../hotfixes/apply-early-reader-preview.py
           python3 ../hotfixes/apply-library-layout-final.py
+          cp ../additions/reader-controls.js app/src/main/assets/reader-controls.js
+          python3 ../hotfixes/apply-reading-platform-20261030.py
+          python3 ../hotfixes/apply-reader-controls-20261030.py
+          python3 -m py_compile ../hotfixes/apply-reading-platform-20261030.py ../hotfixes/apply-reader-controls-20261030.py
+          node --check app/src/main/assets/reader-controls.js
+          grep -Fq 'openFolderImages' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'showFgMedia' app/src/main/java/com/openlocal/office/MainActivity.java
           python3 -m py_compile ../noworld-bridge/blender_preview_export.py ../noworld-bridge/noworld_asset_bridge.py
           python3 -m unittest discover -s ../noworld-bridge -p 'test_*.py' -v
           python3 -m py_compile ../noworld-bridge/inspect_noworld_glb.py
