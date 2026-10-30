@@ -172,7 +172,7 @@ s=s.replace(anchor,methods+anchor,1)
 # than the old deliberately unsupported-file error.
 anchor='''                String quickType = detectType(uri, name);'''
 assert s.count(anchor)==1,"File detection anchor changed"
-s=s.replace(anchor,anchor+'''
+s=s.replace(anchor,'''
                 String lowerMediaName=name.toLowerCase(java.util.Locale.ROOT);
                 if(lowerMediaName.endsWith(".mp3")||lowerMediaName.endsWith(".mp4")||
                    lowerMediaName.endsWith(".m4a")||lowerMediaName.endsWith(".webm")){
@@ -180,7 +180,8 @@ s=s.replace(anchor,anchor+'''
                         lowerMediaName.endsWith(".webm");
                     runOnUiThread(()->showFgMedia(uri,name,isVideo));
                     return;
-                }''',1)
+                }
+                String quickType = detectType(uri, name);''',1)
 # WebView serves individual images on demand, never loading the folder into
 # memory or downloading all pictures before page 1 is displayed.
 anchor='''                    if(assetPath!=null&&assetPath.startsWith("/cover/")){'''
