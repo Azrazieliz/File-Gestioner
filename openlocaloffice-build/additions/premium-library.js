@@ -49,7 +49,7 @@ const categories=[
  ['all','All'],['comic','Comics'],['book','Books'],
  ['document','Documents'],['model','3D assets']
 ];
-let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false;
+let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 function classify(entry){
  if(entry.folder)return 'folder';
  const x=entry.name.toLowerCase();
@@ -76,13 +76,40 @@ function tint(name){
 }
 function openBook(item){
  if(item.folder){
-   stack.push(currentFolder);currentFolder=item.id;request();return;
+   bridge()?.openImageFolder?.(item.uri);
+   return;
  }
+ activeUri=item.uri;
  root.classList.add('fg-lib-hidden');
  visible=false;
  document.getElementById('home')?.classList.add('hidden');
  document.getElementById('work')?.classList.remove('hidden');
  bridge()?.openLibraryFile?.(item.uri);
+}
+// Never start five remote archive transfers at once. Image requests run only
+// after the corresponding tile intersects the viewport; each finishes before
+// the next starts. Opening a book cancels the pending (not-yet-started) work.
+let coverQueue=Promise.resolve();
+const queuedCovers=new WeakSet();
+const coverObserver=window.IntersectionObserver?new IntersectionObserver(changes=>{
+ for(const item of changes){
+   if(!item.isIntersecting)continue;
+   coverObserver.unobserve(item.target);
+   item.target._fgStartCover?.();
+ }
+},{root:body,rootMargin:'0px'}):null;
+function loadRemoteCover(image,url,cover){
+ if(queuedCovers.has(image))return;
+ queuedCovers.add(image);
+ coverQueue=coverQueue.catch(()=>{}).then(()=>new Promise(resolve=>{
+   if(!image.isConnected||!visible){resolve();return;}
+   const indicator=E('span','fg-lib-cover-loading','Loading cover…');
+   cover.appendChild(indicator);
+   const finish=()=>{indicator.remove();resolve();};
+   image.addEventListener('load',finish,{once:true});
+   image.addEventListener('error',finish,{once:true});
+   image.src=url;
+ }));
 }
 function card(item,i){
  const c=classify(item),tile=E('article','fg-lib-tile fg-lib-'+c);
@@ -93,14 +120,19 @@ function card(item,i){
  fallback.append(E('span','fg-lib-fallback-glyph',icon(c)),
                  E('strong','fg-lib-fallback-title',item.title));
  cover.appendChild(fallback);
- if(item.cover&&!item.folder){
+ if(item.cover){
    const image=E('img','fg-lib-cover-image');
    image.loading='lazy';image.decoding='async';
    image.alt='Cover · '+item.title;
    image.addEventListener('load',()=>{cover.classList.add('fg-lib-has-image');});
-   image.addEventListener('error',()=>{image.remove();});
-   image.src=item.cover;
+   image.addEventListener('error',()=>{if(!item.remoteCover)image.remove();});
    cover.appendChild(image);
+   if(item.remoteCover){
+     // Automatic, sequential, visibility-prioritized cloud thumbnail loading.
+     cover._fgStartCover=()=>loadRemoteCover(image,item.cover,cover);
+     if(coverObserver)coverObserver.observe(cover);
+     else cover._fgStartCover();
+   }else image.src=item.cover;
  }
  const badge=E('span','fg-lib-type',label(item));
  cover.appendChild(badge);
@@ -163,6 +195,22 @@ function showEmpty(){
    E('strong','','Build your personal library'),
    E('p','','Select a folder to see the actual covers of your books and image archives.'),
    add);
+}
+function enterFolder(id){
+ const entry=entries.find(x=>x.folder&&x.id===id);
+ if(!entry)return;
+ stack.push(currentFolder);currentFolder=id;request();
+}
+function openSibling(direction){
+ const sorted=entries.filter(e=>!e.folder&&
+   /\.(epub|pdf|zip|cbz|cbr|jpe?g|png|webp|gif|avif)$/i.test(e.name||''))
+   .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+ const i=sorted.findIndex(e=>e.uri===activeUri);
+ if(i<0||!sorted.length)return false;
+ const next=sorted[i+Math.sign(direction)];
+ if(!next)return false;
+ openBook(next);
+ return true;
 }
 function navigateBack(){
  if(stack.length){currentFolder=stack.pop();request();return;}
@@ -231,15 +279,20 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,receive,error,handleBack:handleAndroidBack,
+ show,receive,error,handleBack:handleAndroidBack,enterFolder,openSibling,
  isVisible:()=>visible,
  openCollection:()=>{
    currentFolder='';stack=[];show();
  },missingCollection:showEmpty
 };
-document.addEventListener('DOMContentLoaded',()=>{
- // The native app never forces a folder selection; all providers remain opt-in.
+const initializeLibrary=()=>{
+ // Handle both early page loads and scripts loaded after DOMContentLoaded.
+ if(window.__fgLibraryInitialized)return;
+ window.__fgLibraryInitialized=true;
  show();
  bridge()?.readerDiagnostic?.('LIBRARY_READY');
-});
+};
+if(document.readyState==='loading')
+ document.addEventListener('DOMContentLoaded',initializeLibrary,{once:true});
+else initializeLibrary();
 })();
