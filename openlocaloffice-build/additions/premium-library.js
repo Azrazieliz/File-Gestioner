@@ -271,7 +271,11 @@ function show(){
 }
 function append(payload){
  if(!payload||!Array.isArray(payload.items))return;
- if(activeVersion===null)activeVersion=payload.version;
+ if(activeVersion===null){
+   activeVersion=payload.version;
+   // SAF reports the resolved tree document ID, not the empty root alias.
+   currentFolder=payload.folder||currentFolder;
+ }
  if(payload.version!==activeVersion||payload.folder!==currentFolder)return;
  entries.push(...payload.items);
  scanning=!payload.finished;loaded=true;
