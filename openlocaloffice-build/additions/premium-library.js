@@ -259,6 +259,7 @@ window.loadDocument=function(payload){
  return upstreamLoad(payload);
 };
 function handleAndroidBack(){
+ if(window.FileGestionerReading?.handleBack?.())return true;
  // Reading settings are a modal surface, not an exit command.
  const drawer=document.querySelector('.fg-book-drawer:not(.fg-book-hidden)');
  if(drawer){drawer.classList.add('fg-book-hidden');return true;}
