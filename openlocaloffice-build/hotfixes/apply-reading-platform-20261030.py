@@ -226,7 +226,7 @@ s=s.replace(destroy,destroy+'''
 main.write_text(s)
 reader=root/"java/com/openlocal/office/core/ReaderLibrary.java"
 text=reader.read_text()
-assert 'private static int naturalCompare' in text
+assert 'public static int naturalCompare' in text or 'private static int naturalCompare' in text
 text=text.replace('private static int naturalCompare','public static int naturalCompare',1)
 assert '".png",".webp",".avif",".gif",' in text
 text=text.replace('".png",".webp",".avif",".gif",','".png",".webp",".avif",".gif",".mp3",".mp4",".m4a",".webm",',1)
