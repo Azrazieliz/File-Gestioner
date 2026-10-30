@@ -126,6 +126,7 @@ jobs:
           grep -Fq 'androidx.media3:media3-exoplayer:1.11.1' app/build.gradle.kts
           grep -Fq 'FgMediaPlayer' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'fgFolderPageMap' app/src/main/java/com/openlocal/office/MainActivity.java
+          node ../hotfixes/test-media-image-regressions.cjs
           python3 -m py_compile ../hotfixes/apply-reading-platform-20261030.py ../hotfixes/apply-reader-controls-20261030.py
           node --check app/src/main/assets/reader-controls.js
           grep -Fq 'openFolderImages' app/src/main/java/com/openlocal/office/MainActivity.java
