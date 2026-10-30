@@ -50,9 +50,9 @@ n.write_text(s)
 
 p=assets/"premium-library.js"
 s=p.read_text()
-assert "function show(){\n visible=true;" in s
-s=s.replace("function show(){\n visible=true;",
-            "function show(){\n bridge()?.setReadingImmersive?.(false);\n document.body.classList.remove('fg-reader-fullscreen','fg-reader-chrome-open');\n visible=true;")
+assert "function show(){" in s
+s=s.replace("function show(){",
+            "function show(){\n bridge()?.setReadingImmersive?.(false);\n document.body.classList.remove('fg-reader-fullscreen','fg-reader-chrome-open');",1)
 old="window.loadDocument=function(payload){\n visible=false;"
 assert old in s
 s=s.replace(old,"""window.loadDocument=function(payload){
