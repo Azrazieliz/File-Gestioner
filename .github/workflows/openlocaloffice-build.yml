@@ -116,6 +116,15 @@ jobs:
           cp ../additions/reader-controls.js app/src/main/assets/reader-controls.js
           python3 ../hotfixes/apply-reading-platform-20261030.py
           python3 ../hotfixes/apply-reader-controls-20261030.py
+          python3 ../hotfixes/apply-scale-library-20261031.py
+          python3 ../hotfixes/apply-scale-media-20261031.py
+          python3 ../hotfixes/apply-streamed-image-folders-20261031.py
+          cp ../additions/FgMediaPlayer.java app/src/main/java/com/openlocal/office/core/FgMediaPlayer.java
+          python3 -m py_compile ../hotfixes/apply-scale-library-20261031.py ../hotfixes/apply-scale-media-20261031.py ../hotfixes/apply-streamed-image-folders-20261031.py
+          grep -Fq 'ReaderLibrary.stream(' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'androidx.media3:media3-exoplayer:1.11.1' app/build.gradle.kts
+          grep -Fq 'FgMediaPlayer' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'fgFolderPageMap' app/src/main/java/com/openlocal/office/MainActivity.java
           python3 -m py_compile ../hotfixes/apply-reading-platform-20261030.py ../hotfixes/apply-reader-controls-20261030.py
           node --check app/src/main/assets/reader-controls.js
           grep -Fq 'openFolderImages' app/src/main/java/com/openlocal/office/MainActivity.java
