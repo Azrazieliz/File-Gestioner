@@ -49,7 +49,7 @@ const categories=[
  ['all','All'],['comic','Comics'],['book','Books'],
  ['document','Documents'],['model','3D assets']
 ];
-let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false;
+let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 function classify(entry){
  if(entry.folder)return 'folder';
  const x=entry.name.toLowerCase();
@@ -76,8 +76,10 @@ function tint(name){
 }
 function openBook(item){
  if(item.folder){
-   stack.push(currentFolder);currentFolder=item.id;request();return;
+   bridge()?.openImageFolder?.(item.uri);
+   return;
  }
+ activeUri=item.uri;
  root.classList.add('fg-lib-hidden');
  visible=false;
  document.getElementById('home')?.classList.add('hidden');
@@ -194,6 +196,22 @@ function showEmpty(){
    E('p','','Select a folder to see the actual covers of your books and image archives.'),
    add);
 }
+function enterFolder(id){
+ const entry=entries.find(x=>x.folder&&x.id===id);
+ if(!entry)return;
+ stack.push(currentFolder);currentFolder=id;request();
+}
+function openSibling(direction){
+ const sorted=entries.filter(e=>!e.folder&&
+   /\.(epub|pdf|zip|cbz|cbr|jpe?g|png|webp|gif|avif)$/i.test(e.name||''))
+   .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+ const i=sorted.findIndex(e=>e.uri===activeUri);
+ if(i<0||!sorted.length)return false;
+ const next=sorted[i+Math.sign(direction)];
+ if(!next)return false;
+ openBook(next);
+ return true;
+}
 function navigateBack(){
  if(stack.length){currentFolder=stack.pop();request();return;}
  show();
@@ -261,7 +279,7 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,receive,error,handleBack:handleAndroidBack,
+ show,receive,error,handleBack:handleAndroidBack,enterFolder,openSibling,
  isVisible:()=>visible,
  openCollection:()=>{
    currentFolder='';stack=[];show();
