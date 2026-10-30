@@ -149,14 +149,61 @@ function attach(){
  pageMode(saved('mode','scroll'));useStyle();update();
 }
 document.addEventListener('click',e=>{
- const img=e.target?.closest?.('.fg-book img,.fg-document-sheet img');
+ const img=e.target?.closest?.('.fg-book img,.fg-document-sheet img,.fg-folder-page img');
  if(!img||lightbox)return;
  e.preventDefault();e.stopPropagation();zoomImage(img.currentSrc||img.src);
 },true);
+function renderImageFolder(data){
+ const pages=Array.isArray(data.pages)?data.pages:[];
+ const editor=by('#editor');
+ if(!editor)return;
+ document.body.classList.add('fg-folder-reading');
+ const host=el('div','fg-folder-reader');
+ const view=el('div','fg-folder-scroll');
+ view.setAttribute('role','document');view.setAttribute('aria-label','Folder image reader');
+ const stack=el('div','fg-folder-stack');view.append(stack);host.append(view);
+ editor.replaceChildren(host);
+ for(const id of ['sheetBar','spreadsheetTools','textFormat','notice']){
+  by('#'+id)?.classList.add('hidden');
+ }
+ let observer=null,index=0;
+ const appendBatch=()=>{
+  if(!host.isConnected){observer?.disconnect();return;}
+  const frag=document.createDocumentFragment();
+  const end=Math.min(pages.length,index+100);
+  while(index<end){
+   const i=index++,page=pages[i];
+   if(!page?.url)continue;
+   const section=el('section','fg-folder-page');
+   section.dataset.page=String(i);
+   const image=el('img','fg-folder-image');
+   image.alt=page.name||'Image '+i;image.loading='lazy';
+   image.decoding='async';image.dataset.src=page.url;
+   section.append(image);frag.append(section);
+   if(observer)observer.observe(image);
+   else image.src=page.url;
+  }
+  stack.append(frag);
+  if(index<pages.length)requestAnimationFrame(appendBatch);
+  else observer?.takeRecords();
+ };
+ if(window.IntersectionObserver){
+  observer=new IntersectionObserver(records=>{
+   for(const record of records){
+    if(!record.isIntersecting)continue;
+    const image=record.target;observer.unobserve(image);
+    if(image.dataset.src)image.src=image.dataset.src;
+   }
+  },{root:view,rootMargin:'140% 0px',threshold:0});
+ }
+ if(!pages.length)stack.append(el('p','fg-reader-empty','This folder has no readable images.'));
+ appendBatch();
+}
 const upstream=window.loadDocument;
 window.loadDocument=function(data){
  reading=data;remove();
  const result=upstream.apply(this,arguments);
+ if(data?.type==='folderImages')renderImageFolder(data);
  requestAnimationFrame(()=>requestAnimationFrame(attach));
  return result;
 };
