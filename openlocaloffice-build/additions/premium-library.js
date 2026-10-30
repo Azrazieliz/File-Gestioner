@@ -78,6 +78,13 @@ function tint(name){
 }
 function openBook(item){
  if(item.folder){
+   // An image folder IS a document view. Hide the library first or it
+   // remains above the reader even though all images load successfully.
+   activeUri=item.uri;
+   root.classList.add('fg-lib-hidden');
+   visible=false;
+   document.getElementById('home')?.classList.add('hidden');
+   document.getElementById('work')?.classList.remove('hidden');
    bridge()?.openImageFolder?.(item.uri);
    return;
  }
@@ -298,6 +305,9 @@ function receive(payload){
  filters.classList.remove('fg-lib-hidden');render();
 }
 function error(message){
+ // Errors during image-folder opening must be visible, not trapped behind
+ // the hidden library and an empty reader.
+ visible=true;root.classList.remove('fg-lib-hidden');
  loading.classList.add('fg-lib-hidden');deck.classList.add('fg-lib-hidden');
  empty.classList.remove('fg-lib-hidden');
  empty.replaceChildren(E('strong','','This folder could not be read'),
