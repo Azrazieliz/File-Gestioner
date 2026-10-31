@@ -59,6 +59,7 @@ repl=r'''    private final java.util.concurrent.ExecutorService fgDirectoryExecu
                         }
                         final String json=new org.json.JSONObject()
                             .put("version",request).put("folder",directory)
+                            .put("requestedFolder",folder==null?"":folder)
                             .put("finished",finished).put("items",batch).toString();
                         if(request==fgDirectoryVersion.get()){
                             runOnUiThread(()->{
