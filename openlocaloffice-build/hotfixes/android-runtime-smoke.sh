@@ -14,10 +14,16 @@ trap capture_diagnostics EXIT
 
 wait_for_log() {
   tag="$1"; pattern="$2"; seconds="$3"
+  seen_running=0
   for ((i=0;i<seconds;i+=3)); do
     if adb logcat -d -s "${tag}:I" | grep -E "${pattern}"; then return 0; fi
-    if ! adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+'; then
-      echo "App process stopped while awaiting ${pattern}"
+    if adb shell pidof -s com.openlocal.office | grep -Eq '[0-9]+'; then
+      seen_running=1
+    elif ((seen_running == 1)); then
+      echo "App process exited after launch while awaiting ${pattern}"
+      return 1
+    elif ((i >= 45)); then
+      echo "App never started after 45 seconds while awaiting ${pattern}"
       return 1
     fi
     sleep 3
