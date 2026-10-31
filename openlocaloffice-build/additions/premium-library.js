@@ -54,7 +54,7 @@ const categories=[
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 let activeVersion=null,scanning=false,pageStart=0,renderTimer=0,lastRender=0;
-let imagePumpVersion=0,imagePumpState=null,listingRequest='',operationDialog=null;
+let imagePumpVersion=0,imagePumpState=null,listingRequest='',operationDialog=null,pendingFolderImageRead=null;
 let sortBy='name',sortDescending=false;
 const PAGE=96;
 function classify(entry){
@@ -105,7 +105,7 @@ function openBook(item){
    const siblings=entries.filter(x=>!x.folder&&classify(x)==='image')
      .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
    const version=++imagePumpVersion;
-   imagePumpState={version,siblings,offset:0,started:false};
+   imagePumpState={version,siblings,offset:0,started:false,live:scanning,folder:currentFolder,paused:false,feed:null};
    // Native loads the viewer first. It notifies us after installing the
    // image-reader callback, so no early Round Sync batch can be lost.
    bridge().beginImageCollection(item.uri);
@@ -223,12 +223,10 @@ function showFileActions(item){
    closeFileActions();openBook(item);
  });
  if(item.folder)
-   fileAction(sheet,'Read folder images','Progressively read images without leaving this folder',()=>{
+   fileAction(sheet,'Read folder images','Read images as soon as cloud metadata becomes available',()=>{
      closeFileActions();
-     visible=false;root.classList.add('fg-lib-hidden');
-     document.getElementById('home')?.classList.add('hidden');
-     document.getElementById('work')?.classList.remove('hidden');
-     bridge()?.openImageFolder?.(item.uri);
+     pendingFolderImageRead=item.id;
+     enterFolder(item.id);
    });
  if(kind==='image')
    fileAction(sheet,'View only this image','Keep this image separate from its folder',()=>{
@@ -482,11 +480,13 @@ function openSibling(direction){
  return true;
 }
 function navigateBack(){
+ pendingFolderImageRead=null;
  closeFileActions();
  if(stack.length){currentFolder=stack.pop();request();return;}
  show();
 }
 function show(){
+ pendingFolderImageRead=null;
  closeFileActions();
  imagePumpVersion++;imagePumpState=null;
  window.FileGestionerReading?.close?.();
@@ -510,8 +510,25 @@ function append(payload){
    currentFolder=payload.folder||currentFolder;
  }
  if(payload.version!==activeVersion||payload.folder!==currentFolder)return;
+ const fresh=payload.items.filter(e=>!e.folder&&classify(e)==='image');
  entries.push(...payload.items);
  scanning=!payload.finished;loaded=true;
+ const state=imagePumpState;
+ if(state && state.live && state.folder===payload.folder){
+   const known=new Set(state.siblings.map(e=>e.uri));
+   for(const entry of fresh)if(!known.has(entry.uri)){
+     known.add(entry.uri);state.siblings.push(entry);
+   }
+   if(payload.finished)state.live=false;
+   if(state.paused&&state.feed){state.paused=false;state.feed();}
+ }
+ if(pendingFolderImageRead===payload.folder&&fresh.length){
+   pendingFolderImageRead=null;
+   const first=entries.filter(e=>!e.folder&&classify(e)==='image')
+     .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}))[0];
+   if(first)openBook(first);
+ }
+ if(payload.finished&&pendingFolderImageRead===payload.folder)pendingFolderImageRead=null;
  loading.classList.add('fg-lib-hidden');deck.classList.remove('fg-lib-hidden');
  empty.classList.remove('fg-lib-hidden');
  heading.textContent=stack.length?'Collection':'Your library';
@@ -592,6 +609,7 @@ window.FileGestionerLibrary={
    const feed=()=>{
      if(imagePumpState!==state||imagePumpVersion!==state.version)return;
      if(state.offset>=state.siblings.length){
+       if(state.live && scanning){state.paused=true;return;}
        bridge()?.finishImageCollection?.();imagePumpState=null;return;
      }
      const batch=state.siblings.slice(state.offset,state.offset+64)
@@ -600,6 +618,7 @@ window.FileGestionerLibrary={
      bridge()?.appendImageCollectionChunk?.(JSON.stringify(batch));
      setTimeout(feed,0);
    };
+   state.feed=feed;
    feed();
  },
  isVisible:()=>visible,
