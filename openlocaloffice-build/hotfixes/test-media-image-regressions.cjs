@@ -87,4 +87,16 @@ assert(main.includes('canManageLibraryFiles'), 'SAF write permission guard missi
 assert(libFile.includes('A file manager must show every regular file'),
   'Unrecognized extensions must not be filtered out');
 assert(main.includes('requestedFolder'), 'Stale cloud folder results not tagged');
+const app=fs.readFileSync('app/src/main/assets/app.js','utf8');
+assert(lib.includes("pendingFolderImageRead=item.id"),'Cloud image folder action must reuse SAF listing');
+assert(lib.includes('if(state.live && scanning)'), 'Image collection must wait for cloud rows');
+assert(lib.includes('state.siblings.push(entry)'), 'Later cloud images must join the active reader');
+assert(lib.includes('if(!visible)return;'),'Hidden library must not rerender for every cloud batch');
+assert(main.includes('COLLECTION_FIRST_BATCH_ms'), 'First cloud metadata batch latency not reported');
+assert(main.includes('transferSafFile(')&&main.includes('fgTransferCancelled'),
+  'Streaming copy/move and cancellation are missing');
+assert(app.includes("doc.format==='xlsx'?1048576:100000"),
+  'Full spreadsheet row navigation is still artificially capped');
+assert(style.includes('body.fg-spreadsheet-reading .bar'),
+  'Spreadsheet must avoid the Android status bar');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
