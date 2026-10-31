@@ -57,7 +57,7 @@ style+="""
 .fg-folder-image{width:100%!important;height:auto!important;display:block!important;max-width:none!important;
  border:0!important;margin:0!important;padding:0!important;object-fit:contain}
 body.fg-folder-reading #editor{padding:0!important;margin:0!important;width:100%!important;
- max-width:none!important;min-height:0!important;overflow:hidden!important}
+ max-width:none!important;display:block!important;height:100%!important;min-height:0!important;overflow:hidden!important}
 body.fg-folder-reading #work{height:100dvh!important;overflow:hidden!important}
 body.fg-folder-reading .bar{display:none!important}
 .fg-control-pages{scroll-snap-type:y proximity}
