@@ -20,6 +20,49 @@ public final class ReaderLibrary {
         Listing(String folder,JSONArray items){this.folder=folder;this.items=items;}
     }
     private ReaderLibrary(){}
+    /** Emit bounded metadata batches while a SAF provider is still enumerating.
+     * No 500-file ceiling, no up-front cover downloads, no all-files JSON.
+     * Providers that yield cursor rows incrementally show the first batch early.
+     */
+    public interface BatchSink {
+        void accept(String folderId,JSONArray batch,boolean finished) throws Exception;
+    }
+    public static Listing stream(Context ctx,Uri tree,String folderId,
+                                 BatchSink sink) throws Exception {
+        String root=DocumentsContract.getTreeDocumentId(tree);
+        String id=folderId==null||folderId.isBlank()?root:folderId;
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,id);
+        String[] cols={DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED};
+        JSONArray batch=new JSONArray();
+        try(Cursor cursor=ctx.getContentResolver().query(children,cols,null,null,null)){
+            if(cursor==null)throw new java.io.IOException("Folder provider returned no cursor");
+            while(cursor.moveToNext()){
+                String did=cursor.getString(0),name=cursor.getString(1),mime=cursor.getString(2);
+                if(name==null||did==null||mime==null)continue;
+                boolean folder=DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
+                // A file manager must show every regular file, not just the reader whitelist.
+                JSONObject item=new JSONObject();
+                item.put("id",did).put("title",stripExtension(name))
+                    .put("name",name).put("mime",mime)
+                    .put("folder",folder)
+                    .put("size",cursor.isNull(3)?-1L:cursor.getLong(3))
+                    .put("modified",cursor.isNull(4)?0L:cursor.getLong(4))
+                    .put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,did).toString());
+                batch.put(item);
+                if(batch.length()>=96){
+                    sink.accept(id,batch,false);
+                    batch=new JSONArray();
+                }
+            }
+        }
+        sink.accept(id,batch,true);
+        return new Listing(id,new JSONArray());
+    }
+
     public static Listing list(Context ctx,Uri tree,String folderId) throws Exception{
         String root=DocumentsContract.getTreeDocumentId(tree);
         String id=folderId==null||folderId.isBlank()?root:folderId;
@@ -40,7 +83,7 @@ public final class ReaderLibrary {
                 if(name==null||did==null||mime==null)continue;
                 boolean folder=DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
                 String lower=name.toLowerCase(Locale.ROOT);
-                if(!folder&&!supported(lower))continue;
+                // Even unsupported file types must remain visible in directory listings.
                 JSONObject item=new JSONObject();
                 item.put("id",did).put("title",stripExtension(name))
                     .put("name",name).put("mime",mime)
@@ -54,11 +97,76 @@ public final class ReaderLibrary {
         }
         return new Listing(id,array);
     }
+    /** First actual image or supported book in a folder. Metadata only:
+     * do not download any book while listing a collection.
+     */
+    public static final class CoverCandidate {
+        public final Uri uri;
+        public final String name;
+        public final long size;
+        public final long modified;
+        CoverCandidate(Uri uri,String name,long size,long modified){
+            this.uri=uri;this.name=name;this.size=size;this.modified=modified;
+        }
+    }
+    public static CoverCandidate firstCover(Context ctx,Uri directory) throws Exception {
+        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(
+            directory,DocumentsContract.getDocumentId(directory));
+        String[] cols={DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED};
+        String bestId=null,bestName=null;
+        long bestSize=-1,bestModified=0;
+        try(Cursor cursor=ctx.getContentResolver().query(children,cols,null,null,null)){
+            if(cursor==null)return null;
+            int scanned=0;
+            while(cursor.moveToNext()&&scanned++<2000){
+                String id=cursor.getString(0),name=cursor.getString(1),mime=cursor.getString(2);
+                if(id==null||name==null||mime==null)continue;
+                String low=name.toLowerCase(Locale.ROOT);
+                if(name.startsWith(".")||low.startsWith("._")||
+                   !(low.endsWith(".jpg")||low.endsWith(".jpeg")||
+                     low.endsWith(".png")||low.endsWith(".webp")||
+                     low.endsWith(".epub")||low.endsWith(".cbz")||
+                     low.endsWith(".zip")||low.endsWith(".pdf")))continue;
+                if(bestName==null||naturalCompare(name,bestName)<0){
+                    bestName=name;bestId=id;
+                    bestSize=cursor.isNull(3)?-1:cursor.getLong(3);
+                    bestModified=cursor.isNull(4)?0:cursor.getLong(4);
+                }
+            }
+        }
+        return bestId==null?null:new CoverCandidate(
+            DocumentsContract.buildDocumentUriUsingTree(directory,bestId),
+            bestName,bestSize,bestModified);
+    }
+    public static int naturalCompare(String a,String b){
+        int i=0,j=0;
+        while(i<a.length()&&j<b.length()){
+            char x=a.charAt(i),y=b.charAt(j);
+            if(Character.isDigit(x)&&Character.isDigit(y)){
+                int startI=i,startJ=j;
+                while(i<a.length()&&Character.isDigit(a.charAt(i)))i++;
+                while(j<b.length()&&Character.isDigit(b.charAt(j)))j++;
+                String n=a.substring(startI,i).replaceFirst("^0+(?!$)","");
+                String m=b.substring(startJ,j).replaceFirst("^0+(?!$)","");
+                if(n.length()!=m.length())return Integer.compare(n.length(),m.length());
+                int c=n.compareTo(m);if(c!=0)return c;
+            }else{
+                int c=Character.compare(Character.toLowerCase(x),Character.toLowerCase(y));
+                if(c!=0)return c;i++;j++;
+            }
+        }
+        return Integer.compare(a.length(),b.length());
+    }
     private static boolean supported(String filename){
         for(String suffix:new String[]{
             ".zip",".cbz",".cbr",".epub",".pdf",".docx",".doc",
             ".xlsx",".xls",".csv",".txt",".md",".rtf",".odt",".ods",
             ".sdocx",".jpg",".jpeg",".png",".webp",".avif",".gif",
+            ".mp3",".mp4",".m4a",".webm",".mkv",".mov",
             ".glb",".gltf",".fbx",".obj",".blend",".vrm",".pmx",".pmd"
         })if(filename.endsWith(suffix))return true;
         return false;
