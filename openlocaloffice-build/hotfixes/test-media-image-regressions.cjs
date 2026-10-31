@@ -85,7 +85,10 @@ assert(main.includes('openLibraryExternally'), 'Android external-open not connec
 assert(main.includes('renameLibraryFile'), 'SAF rename not connected');
 assert(main.includes('deleteLibraryFile'), 'SAF delete not connected');
 assert(main.includes('canManageLibraryFiles'), 'SAF write permission guard missing');
-assert(libFile.includes('A file manager must show every regular file'),
+const streamBody=libFile.slice(libFile.indexOf('public static Listing stream('),
+ libFile.indexOf('public static Listing list('));
+assert(streamBody.includes('item.put("id",did)') &&
+  !streamBody.includes('!supported('),
   'Unrecognized extensions must not be filtered out');
 assert(main.includes('requestedFolder'), 'Stale cloud folder results not tagged');
 const app=fs.readFileSync('app/src/main/assets/app.js','utf8');
