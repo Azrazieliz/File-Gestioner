@@ -529,6 +529,9 @@ function append(payload){
    if(first)openBook(first);
  }
  if(payload.finished&&pendingFolderImageRead===payload.folder)pendingFolderImageRead=null;
+ // Keep the indexed metadata for paging and image streaming, but do not
+ // repeatedly rebuild the hidden library during an active reader session.
+ if(!visible)return;
  loading.classList.add('fg-lib-hidden');deck.classList.remove('fg-lib-hidden');
  empty.classList.remove('fg-lib-hidden');
  heading.textContent=stack.length?'Collection':'Your library';
