@@ -236,8 +236,11 @@ public final class FgMediaPlayer implements AutoCloseable {
                 if(!cacheDir.exists()&&!cacheDir.mkdirs())
                     throw new IOException("Media cache directory is not available");
                 String low=filename.toLowerCase(Locale.ROOT);
-                String extension=low.endsWith(".webm")?".webm":
-                    low.endsWith(".m4a")?".m4a":low.endsWith(".mp3")?".mp3":".mp4";
+                String extension=".mp4";
+                for(String suffix:new String[]{".webm",".mkv",".mov",".m4a",
+                    ".mp3",".flac",".wav",".ogg",".opus"}){
+                    if(low.endsWith(suffix)){extension=suffix;break;}
+                }
                 File ready=new File(cacheDir,digest(original)+extension);
                 File complete=new File(cacheDir,digest(original)+".complete");
                 if(ready.isFile()&&ready.length()>0&&complete.isFile()){
