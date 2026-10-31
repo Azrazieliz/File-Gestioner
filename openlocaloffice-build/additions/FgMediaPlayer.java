@@ -2,6 +2,10 @@ package com.openlocal.office.core;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.content.pm.ActivityInfo;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.widget.LinearLayout;
 import android.os.StatFs;
 import android.util.Log;
 import android.view.Gravity;
@@ -30,6 +34,11 @@ public final class FgMediaPlayer implements AutoCloseable {
     private final Activity activity;
     private final FrameLayout root;
     private final TextView status;
+    private final PlayerView display;
+    private final int previousOrientation;
+    private final int previousSystemUi;
+    private final boolean wasFullscreen;
+    private final boolean wasKeepScreenOn;
     private final ExoPlayer player;
     private final ExecutorService io=Executors.newSingleThreadExecutor();
     private volatile boolean closed;
@@ -45,10 +54,20 @@ public final class FgMediaPlayer implements AutoCloseable {
                          boolean video,Runnable onExit){
         this.activity=activity;this.original=original;this.filename=filename;
         this.video=video;this.onExit=onExit;
+        previousOrientation=activity.getRequestedOrientation();
+        previousSystemUi=activity.getWindow().getDecorView().getSystemUiVisibility();
+        int flags=activity.getWindow().getAttributes().flags;
+        wasFullscreen=(flags&android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)!=0;
+        wasKeepScreenOn=(flags&android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)!=0;
         root=new FrameLayout(activity);
         root.setBackgroundColor(0xff090c13);
-        PlayerView display=new PlayerView(activity);
+        display=new PlayerView(activity);
         display.setUseController(true);
+        if(video){
+            display.setControllerShowTimeoutMs(2600);
+            display.setShowRewindButton(false);
+            display.setShowFastForwardButton(false);
+        }
         FrameLayout.LayoutParams videoLayout=new FrameLayout.LayoutParams(-1,-1);
         videoLayout.gravity=Gravity.CENTER;
         root.addView(display,videoLayout);
@@ -60,11 +79,54 @@ public final class FgMediaPlayer implements AutoCloseable {
         title.setBackgroundColor(0xcc152039);
         title.setPadding(20,16,150,16);
         title.setTextSize(14);
-        root.addView(title,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        if(!video)root.addView(title,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         Button back=new Button(activity);
         back.setText("Back");
         back.setOnClickListener(v->onExit.run());
-        root.addView(back,new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT));
+        if(!video)root.addView(back,new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.RIGHT));
+        else {
+            // Edge taps capture only the middle of the image, preserving
+            // Media3's seek bar and central playback controls.
+            final LinearLayout gestureRow=new LinearLayout(activity);
+            gestureRow.setOrientation(LinearLayout.HORIZONTAL);
+            for(int side=-1;side<=1;side++){
+                View zone=new View(activity);
+                gestureRow.addView(zone,new LinearLayout.LayoutParams(0,-1,1f));
+                if(side==0)continue;
+                final int direction=side;
+                GestureDetector detector=new GestureDetector(activity,
+                    new GestureDetector.SimpleOnGestureListener(){
+                        @Override public boolean onDown(MotionEvent event){return true;}
+                        @Override public boolean onSingleTapConfirmed(MotionEvent event){
+                            if(display.isControllerFullyVisible())display.hideController();
+                            else display.showController();
+                            return true;
+                        }
+                        @Override public boolean onDoubleTap(MotionEvent event){
+                            if(!closed && player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)){
+                                long position=player.getCurrentPosition()+direction*10000L;
+                                long duration=player.getDuration();
+                                position=Math.max(0L,position);
+                                if(duration>0)position=Math.min(position,duration);
+                                player.seekTo(position);
+                                Log.i("FG_MEDIA", direction<0?"DOUBLE_TAP_BACK_10S":"DOUBLE_TAP_FORWARD_10S");
+                            }
+                            return true;
+                        }
+                    });
+                zone.setOnTouchListener((v,event)->detector.onTouchEvent(event));
+            }
+            root.addView(gestureRow,new FrameLayout.LayoutParams(-1,-1,Gravity.CENTER));
+            root.addOnLayoutChangeListener((v,left,top,right,bottom,ol,ot,or_,ob)->{
+                FrameLayout.LayoutParams params=(FrameLayout.LayoutParams)gestureRow.getLayoutParams();
+                int desired=Math.max(1,Math.round((bottom-top)*0.72f));
+                if(params.height!=desired){
+                    params.height=desired;params.gravity=Gravity.CENTER;
+                    gestureRow.setLayoutParams(params);
+                }
+            });
+            enterVideoFullscreen();
+        }
         status=new TextView(activity);
         status.setTextColor(0xffcbd9ed);
         status.setTextSize(13);
@@ -104,6 +166,27 @@ public final class FgMediaPlayer implements AutoCloseable {
         }else play(original);
     }
     public View getView(){return root;}
+    private void enterVideoFullscreen(){
+        activity.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        activity.getWindow().addFlags(
+            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN |
+            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        activity.getWindow().getDecorView().setSystemUiVisibility(
+            View.SYSTEM_UI_FLAG_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY |
+            View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+            View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+            View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+    }
+    private void leaveVideoFullscreen(){
+        activity.getWindow().getDecorView().setSystemUiVisibility(previousSystemUi);
+        if(!wasFullscreen)activity.getWindow().clearFlags(
+            android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if(!wasKeepScreenOn)activity.getWindow().clearFlags(
+            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        activity.setRequestedOrientation(previousOrientation);
+    }
     private void showMessage(String message){
         activity.runOnUiThread(()->{
             if(closed)return;
@@ -232,5 +315,6 @@ public final class FgMediaPlayer implements AutoCloseable {
         if(growing!=null){growing.cancelled=true;growing.wake();}
         player.stop();player.release();
         io.shutdownNow();
+        if(video)leaveVideoFullscreen();
     }
 }
