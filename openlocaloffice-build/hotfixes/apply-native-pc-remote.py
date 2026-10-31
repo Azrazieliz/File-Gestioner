@@ -19,6 +19,26 @@ method=r'''        @JavascriptInterface public boolean returnToExternalFile(){
             return getSharedPreferences("fg_remote",MODE_PRIVATE)
                 .getString("token","");
         }
+        @JavascriptInterface public String getRemoteEndpoint(){
+            return getSharedPreferences("fg_remote",MODE_PRIVATE)
+                .getString("endpoint","");
+        }
+        @JavascriptInterface public boolean setRemoteEndpoint(String value){
+            if(value==null||value.length()>512)return false;
+            try{
+                java.net.URI address=new java.net.URI(value.trim());
+                if(!"https".equalsIgnoreCase(address.getScheme())||
+                    address.getHost()==null||
+                    address.getRawUserInfo()!=null||
+                    address.getRawPath()!=null&&!address.getRawPath().isEmpty()||
+                    address.getRawQuery()!=null||address.getRawFragment()!=null)
+                    return false;
+                String addressText=address.toASCIIString().replaceAll("/+$","");
+                getSharedPreferences("fg_remote",MODE_PRIVATE)
+                    .edit().putString("endpoint",addressText).apply();
+                return true;
+            }catch(Exception error){return false;}
+        }
         @JavascriptInterface public void setRemoteToken(String token){
             if(token==null||token.length()>256)return;
             getSharedPreferences("fg_remote",MODE_PRIVATE).edit()
@@ -48,7 +68,11 @@ method=r'''        @JavascriptInterface public boolean returnToExternalFile(){
                 try {
                     String token=getSharedPreferences("fg_remote",MODE_PRIVATE)
                         .getString("token","");
-                    if(token==null||token.isBlank())throw new IOException("PC pairing token is missing");
+                    if(token==null||token.isBlank())throw new IOException("This app needs PC authorization");
+                    String remote=getSharedPreferences("fg_remote",MODE_PRIVATE)
+                        .getString("endpoint","");
+                    if(!remote.startsWith("https://"))
+                        throw new IOException("Secure remote PC endpoint is not configured");
                     long size=0;
                     if(!"cube".equals(kind)){
                         staging=java.io.File.createTempFile("fg-remote-", ".bin",getCacheDir());
@@ -66,7 +90,8 @@ method=r'''        @JavascriptInterface public boolean returnToExternalFile(){
                         }
                     }
                     java.net.HttpURLConnection request=(java.net.HttpURLConnection)
-                        new java.net.URL("http://127.0.0.1:39273/api/open?kind="+kind).openConnection();
+                        new java.net.URL(getSharedPreferences("fg_remote",MODE_PRIVATE)
+                            .getString("endpoint","")+"/api/open?kind="+kind).openConnection();
                     request.setRequestMethod("POST");
                     request.setConnectTimeout(6000);
                     request.setReadTimeout(60000);
