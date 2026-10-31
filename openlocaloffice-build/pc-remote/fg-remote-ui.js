@@ -27,7 +27,7 @@ function showRemoteConfig(){
  const save=el('button','fg-pc-action','Save remote address');
  const result=el('div','fg-pc-config-status','');
  save.onclick=()=>{
-   const value=text.value.trim().replace(/\\/+$/,'');
+   const value=text.value.trim().replace(/\/+$/,'');
    if(!/^https:\/\/[^\s/#?]+(?::\d+)?$/.test(value)){
      result.textContent='Use an HTTPS address for the private PC relay.';return;
    }
