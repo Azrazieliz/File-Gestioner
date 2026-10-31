@@ -33,7 +33,7 @@ def is_koikatsu_card(payload):
         if size>45_000_000 or i+12+size>len(payload):return False
         i+=size+12
         if kind==b"IEND":
-            trailer=payload[i:i+256]
+            trailer=payload[i:i+4096]
             return b"KoiKatuChara" in trailer or b"KoikatsuChara" in trailer
     return False
 
