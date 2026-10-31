@@ -51,6 +51,7 @@ const categories=[
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 let activeVersion=null,scanning=false,pageStart=0,renderTimer=0;
+let imagePumpVersion=0;
 const PAGE=96;
 function classify(entry){
  if(entry.folder)return 'folder';
@@ -94,9 +95,26 @@ function openBook(item){
  visible=false;
  document.getElementById('home')?.classList.add('hidden');
  document.getElementById('work')?.classList.remove('hidden');
- if(classify(item)==='image' && bridge()?.openImageInFolder){
-   // Image tiles open the full collection at the selected picture.
-   // Native SAF supplies siblings progressively, also for Round Sync.
+ if(classify(item)==='image' && bridge()?.beginImageCollection){
+   // The library already has the siblings' SAF URIs. Reusing them avoids
+   // a second expensive Round Sync directory query (or a failed cloud scan).
+   const siblings=entries.filter(x=>!x.folder&&classify(x)==='image')
+     .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+   const version=++imagePumpVersion;
+   bridge().beginImageCollection(item.uri);
+   let offset=0;
+   const feed=()=>{
+     if(imagePumpVersion!==version)return;
+     if(offset>=siblings.length){
+       bridge()?.finishImageCollection?.();return;
+     }
+     const batch=siblings.slice(offset,offset+64).map(x=>({uri:x.uri,name:x.name}));
+     offset+=64;
+     bridge()?.appendImageCollectionChunk?.(JSON.stringify(batch));
+     setTimeout(feed,0);
+   };
+   setTimeout(feed,0);
+ }else if(classify(item)==='image' && bridge()?.openImageInFolder){
    bridge().openImageInFolder(currentFolder,item.uri);
  }else{
    bridge()?.openLibraryFile?.(item.uri);
@@ -277,6 +295,7 @@ function navigateBack(){
  show();
 }
 function show(){
+ imagePumpVersion++;
  window.FileGestionerReading?.close?.();
  document.body.classList.remove('fg-folder-reading');
  visible=true;root.classList.remove('fg-lib-hidden');
