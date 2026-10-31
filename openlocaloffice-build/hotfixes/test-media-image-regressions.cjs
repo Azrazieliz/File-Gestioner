@@ -9,7 +9,7 @@ const media=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgMedia
 const growing=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgGrowingMediaDataSource.java','utf8');
 assert(!lib.includes("if(item.folder){\n   bridge()?.openImageFolder"),'Folder overlay is still blocking image pages');
 assert(lib.includes("root.classList.add('fg-lib-hidden');\n   visible=false;"),'Folder must hide library before loading');
-assert(js.includes("if(data?.type==='folderImages'){"),'Special folder route absent');
+assert(js.includes("if(data?.type==='folderImages'||(data?.type==='image'"),'Dedicated image route absent');
 const block=js.slice(js.indexOf("window.loadDocument=function(data){"));
 assert(block.indexOf("renderImageFolder(data);")<block.indexOf("upstream.apply(this,arguments)"),
   'Generic loader must not run before folder image reader');
@@ -50,4 +50,20 @@ assert(media.includes('direction*10000L'),'Left/right double tap must skip ten s
 assert(media.includes('setShowRewindButton(false)')&&media.includes('setShowFastForwardButton(false)'),
   'Video must remove old ten-second buttons');
 assert(media.includes('if(video)leaveVideoFullscreen()'),'Video must restore normal orientation');
+const patchedFolder=fs.readFileSync('../hotfixes/apply-streamed-image-folders-20261031.py','utf8');
+assert(patchedFolder.includes('private void openImageInFolder(String folderId,String selectedUri)'),
+  'Native image collection selection missing');
+assert(patchedFolder.includes('buildChildDocumentsUriUsingTree(\n                    libraryTree,folderId)'),
+  'Cloud image folder not queried with persisted SAF tree');
+assert(patchedFolder.includes('@JavascriptInterface public void openImageInFolder'),
+  'Image collection missing JavaScript bridge');
+assert(lib.includes('bridge().openImageInFolder(currentFolder,item.uri)'),
+  'Image tile still opens only one file');
+assert(lib.includes("['all','All'],['image','Images']"),
+  'Dedicated Images filter missing');
+assert(js.includes('fg-image-toolbar')&&!js.includes('requestAnimationFrame(()=>requestAnimationFrame(attach));\n   return;'),
+  'Image viewer still shows EPUB controls');
+assert(js.includes('imageMode=data.standalone'), 'Single-image smart-fit mode missing');
+assert(style.includes('.fg-image-reader .fg-image-paged .fg-image-rotated .fg-folder-image'),
+  'Landscape pictures still cannot use portrait screen efficiently');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
