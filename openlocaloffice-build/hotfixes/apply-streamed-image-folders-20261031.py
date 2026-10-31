@@ -12,6 +12,22 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
     private final java.util.concurrent.atomic.AtomicLong fgFolderVersion=
         new java.util.concurrent.atomic.AtomicLong();
     private void openFolderImages(String uriText){
+        openFolderImages(uriText,null);
+    }
+    private void openImageInFolder(String folderId,String selectedUri){
+        if(libraryTree==null||selectedUri==null)return;
+        // File URI must have been exposed by our selected collection.
+        if(!allowedLibraryUris.contains(selectedUri)){
+            runOnUiThread(()->js("window.FileGestionerLibrary?.error("+
+                q("This image is no longer in the current collection")+")"));
+            return;
+        }
+        String id=(folderId==null||folderId.isEmpty())?
+            android.provider.DocumentsContract.getTreeDocumentId(libraryTree):folderId;
+        Uri parent=android.provider.DocumentsContract.buildDocumentUriUsingTree(libraryTree,id);
+        openFolderImages(parent.toString(),selectedUri);
+    }
+    private void openFolderImages(String uriText,String selectedUri){
         if(uriText==null||libraryTree==null)return;
         final Uri directory=Uri.parse(uriText);
         // Opening a subfolder must not depend on the current scan's transient
@@ -21,8 +37,7 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
             if(!"content".equals(directory.getScheme())||
                !libraryTree.getAuthority().equals(directory.getAuthority())||
                !android.provider.DocumentsContract.getTreeDocumentId(libraryTree)
-                   .equals(android.provider.DocumentsContract.getTreeDocumentId(directory))||
-               !android.provider.DocumentsContract.isDocumentUri(this,directory))
+                   .equals(android.provider.DocumentsContract.getTreeDocumentId(directory)))
                 throw new SecurityException("Folder is outside the selected library");
         }catch(Exception invalid){
             runOnUiThread(()->js("window.FileGestionerLibrary?.error("+
@@ -32,6 +47,8 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
         final long request=fgFolderVersion.incrementAndGet();
         final String token=java.util.UUID.randomUUID().toString();
         fgFolderToken=token;
+        // Selected file opens immediately even if remote listing takes time.
+        final Uri selected=selectedUri==null?null:Uri.parse(selectedUri);
         fgFolderPageMap.clear();
         fgDirectoryExecutor.execute(()->{
             final java.util.concurrent.atomic.AtomicInteger pageIndex=
@@ -49,7 +66,8 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
                         fgFolderPageMap.put(i,page);
                         images.put(new org.json.JSONObject().put("name",page.name)
                             .put("url","https://fg-assets.invalid/folder-img/"+
-                                token+"/"+i));
+                                token+"/"+i)
+                            .put("selected",selected!=null&&selected.equals(page.uri)));
                     }
                     if(!started.getAndSet(true)){
                         final String payload=new org.json.JSONObject()
@@ -70,8 +88,11 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
                 }catch(Exception e){android.util.Log.w("FG_FOLDER","Batch failed",e);}
             };
             try{
+                final String folderId=android.provider.DocumentsContract.getDocumentId(directory);
+                // Build children through the actual persisted tree grant, not
+                // a child URI that some cloud providers cannot authorize.
                 Uri children=android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
-                    directory,android.provider.DocumentsContract.getDocumentId(directory));
+                    libraryTree,folderId);
                 String[] cols={
                     android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                     android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
@@ -80,9 +101,20 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
                 // Emit the first 64 rows immediately; do not wait for the end.
                 java.util.List<FolderPage> batch=new java.util.ArrayList<>(64);
                 long startMillis=android.os.SystemClock.elapsedRealtime();
-                try(android.database.Cursor cursor=getContentResolver().query(
-                    children,cols,null,null,null)){
-                    if(cursor==null)throw new java.io.IOException("Folder unavailable");
+                android.database.Cursor result=null;
+                try{
+                    try{
+                        result=getContentResolver().query(children,cols,null,null,null);
+                    }catch(Exception treeError){
+                        android.util.Log.w("FG_FOLDER","Cloud tree query failed; trying document URI",treeError);
+                    }
+                    if(result==null){
+                        Uri fallback=android.provider.DocumentsContract.buildChildDocumentsUri(
+                            directory.getAuthority(),folderId);
+                        result=getContentResolver().query(fallback,cols,null,null,null);
+                    }
+                    if(result==null)throw new java.io.IOException("Folder provider did not return images");
+                    try(android.database.Cursor cursor=result){
                     while(cursor.moveToNext()){
                         if(request!=fgFolderVersion.get())return;
                         String id=cursor.getString(0),name=cursor.getString(1),
@@ -94,14 +126,18 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
                              lower.endsWith(".gif")||lower.endsWith(".avif")))continue;
                         if(android.provider.DocumentsContract.Document.MIME_TYPE_DIR
                             .equals(mime))continue;
-                        batch.add(new FolderPage(
-                            android.provider.DocumentsContract.buildDocumentUriUsingTree(
-                                directory,id),name));
+                        Uri file=android.provider.DocumentsContract.buildDocumentUriUsingTree(
+                            libraryTree,id);
+                        batch.add(new FolderPage(file,name));
                         if(batch.size()>=64){
                             flush.accept(batch);
                             batch=new java.util.ArrayList<>(64);
                         }
                     }
+                    }
+                }catch(SecurityException permission){
+                    throw new java.io.IOException("Round Sync folder permission denied: "+
+                        permission.getMessage(),permission);
                 }
                 flush.accept(batch);
                 if(!started.get()){
@@ -121,10 +157,14 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
                     pageIndex.get()+" millis="+
                     (android.os.SystemClock.elapsedRealtime()-startMillis));
             }catch(Exception e){
-                android.util.Log.e("FG_FOLDER","FOLDER_STREAM_FAILED",e);
+                android.util.Log.e("FG_FOLDER","FOLDER_STREAM_FAILED provider="+
+                    directory.getAuthority(),e);
                 if(request==fgFolderVersion.get())
-                    runOnUiThread(()->js("window.FileGestionerLibrary?.error("+
-                        q("Image folder error: "+message(e))+")"));
+                    runOnUiThread(()->{
+                        js("window.FileGestionerFolder?.failed("+q(message(e))+")");
+                        js("window.FileGestionerLibrary?.error("+
+                            q("Cannot browse image folder: "+message(e))+")");
+                    });
             }
         });
     }
@@ -146,7 +186,17 @@ new=r'''                    if(assetPath!=null&&assetPath.startsWith("/folder-im
                                         lower.endsWith(".webp")?"image/webp":
                                         lower.endsWith(".gif")?"image/gif":
                                         lower.endsWith(".avif")?"image/avif":"image/jpeg";
-                                    InputStream input=getContentResolver().openInputStream(page.uri);
+                                    InputStream input=null;
+                                    try{
+                                        input=getContentResolver().openInputStream(page.uri);
+                                    }catch(Exception first){
+                                        android.util.Log.w("FG_FOLDER",
+                                            "SAF openInputStream failed; retrying file descriptor",first);
+                                        android.os.ParcelFileDescriptor descriptor=
+                                            getContentResolver().openFileDescriptor(page.uri,"r");
+                                        if(descriptor!=null)
+                                            input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor);
+                                    }
                                     if(input!=null)return new WebResourceResponse(mime,null,input);
                                 }
                             }catch(Exception e){
@@ -158,5 +208,15 @@ new=r'''                    if(assetPath!=null&&assetPath.startsWith("/folder-im
                     }
 '''
 s=s[:start]+new+s[end:]
+# Add a bridge method without breaking older openImageFolder callers.
+bridge='''        @JavascriptInterface public void openImageFolder(String uri){
+             MainActivity.this.openFolderImages(uri);
+        }
+'''
+assert s.count(bridge)==1
+s=s.replace(bridge,bridge+'''        @JavascriptInterface public void openImageInFolder(String folder,String selected){
+            MainActivity.this.openImageInFolder(folder,selected);
+        }
+''',1)
 main.write_text(s)
-print("Image folder progressively streams batches of 64 pages, no 20k limit, concurrent demand decoding")
+print("SAF image folders: Round Sync tree access, sequential navigation and resilient image streams")
