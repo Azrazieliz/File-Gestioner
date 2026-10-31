@@ -16,8 +16,16 @@ titleGroup.append(E('strong','fg-lib-brand-title','File Gestioner'),
 brand.append(monogram,titleGroup);
 const actions=E('div','fg-lib-actions');
 const openBtn=b('Open file','fg-lib-primary',()=>bridge()?.pickFile?.());
-const collectionBtn=b('Collection','fg-lib-secondary',()=>bridge()?.pickLibraryFolder?.());
-actions.append(openBtn,collectionBtn);header.append(brand,actions);
+const collectionBtn=b('Collection','fg-lib-secondary',()=>{
+ cloudMode=false;currentFolder='';stack=[];bridge()?.pickLibraryFolder?.();
+});
+const tbBtn=b('TeraBox','fg-lib-secondary',()=>{
+ cloudMode=true;currentFolder='';stack=[];
+ if(bridge()?.getTeraboxConfigured?.())show();
+ else showTeraboxSettings();
+});
+tbBtn.title='Native cloud browsing — no RoundSync required';
+actions.append(openBtn,collectionBtn,tbBtn);header.append(brand,actions);
 const welcome=E('section','fg-lib-welcome');
 const kicker=E('p','fg-lib-kicker','OFFLINE READING');
 const hero=E('h1','fg-lib-hero','Your files. Your control.');
@@ -53,6 +61,7 @@ const categories=[
  ['document','Documents'],['model','3D assets'],['file','Other']
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
+let cloudMode=false;
 let activeVersion=null,scanning=false,pageStart=0,renderTimer=0,lastRender=0;
 let imagePumpVersion=0,imagePumpState=null,listingRequest='',operationDialog=null,pendingFolderImageRead=null;
 let sortBy='name',sortDescending=false;
@@ -99,7 +108,18 @@ function openBook(item){
  visible=false;
  document.getElementById('home')?.classList.add('hidden');
  document.getElementById('work')?.classList.remove('hidden');
- if(classify(item)==='image' && bridge()?.beginImageCollection){
+ if(cloudMode && item.terabox && classify(item)==='image' &&
+     bridge()?.beginTeraboxImageCollection){
+   const siblings=entries.filter(x=>!x.folder&&x.terabox&&classify(x)==='image')
+     .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
+   const version=++imagePumpVersion;
+   imagePumpState={version,siblings,offset:0,started:false,live:scanning,
+     folder:currentFolder,paused:false,feed:null,terabox:true};
+   bridge().beginTeraboxImageCollection(item.path,item.name);
+ }else if(cloudMode && item.terabox){
+   visible=true;root.classList.remove('fg-lib-hidden');
+   bridge()?.saveTeraboxFile?.(item.path,item.name);
+ }else if(classify(item)==='image' && bridge()?.beginImageCollection){
    // The library already has the siblings' SAF URIs. Reusing them avoids
    // a second expensive Round Sync directory query (or a failed cloud scan).
    const siblings=entries.filter(x=>!x.folder&&classify(x)==='image')
@@ -208,6 +228,16 @@ function fileProperties(item){
  fileAction(sheet,'Close','',closeFileActions);
 }
 function showFileActions(item){
+ if(item.terabox){
+   const sheet=fileSheet(item.name,(item.folder?'TeraBox folder':'TeraBox · '+formatSize(item.size)));
+   fileAction(sheet,item.folder?'Browse folder':'Open file',
+      'Cloud content without RoundSync',()=>{closeFileActions();openBook(item);});
+   if(!item.folder)fileAction(sheet,'Download to…',
+      'Choose a destination; original remains in your cloud account',
+      ()=>{closeFileActions();bridge()?.saveTeraboxFile?.(item.path,item.name);});
+   fileAction(sheet,'Close','',closeFileActions);
+   return;
+ }
  const kind=classify(item);
  const write=Boolean(bridge()?.canManageLibraryFiles?.());
  const sheet=fileSheet(item.name,(item.folder?'Folder':label(item))+
@@ -457,15 +487,64 @@ function createFilters(){
  }
 }
 function request(){
- if(!bridge()?.getLibraryRoot?.()){showEmpty();return;}
+ if(cloudMode && !bridge()?.getTeraboxConfigured?.()){showTeraboxSettings();return;}
+ if(!cloudMode && !bridge()?.getLibraryRoot?.()){showEmpty();return;}
  activeVersion=null;scanning=true;pageStart=0;entries=[];loaded=false;
  listingRequest=currentFolder||'';lastRender=0;
  if(renderTimer){clearTimeout(renderTimer);renderTimer=0;}
  loading.textContent='Loading your collection…';
  loading.classList.remove('fg-lib-hidden');deck.classList.add('fg-lib-hidden');
  empty.classList.add('fg-lib-hidden');
- bridge()?.listLibrary?.(currentFolder);
+ if(cloudMode)bridge()?.listTerabox?.(currentFolder||'');
+ else bridge()?.listLibrary?.(currentFolder);
 }
+function showTeraboxSettings(){
+ closeFileActions();
+ visible=true;root.classList.remove('fg-lib-hidden');
+ document.getElementById('home')?.classList.add('hidden');
+ document.getElementById('work')?.classList.add('hidden');
+ welcome.classList.add('fg-lib-hidden');
+ toolbar.classList.remove('fg-lib-hidden');
+ filters.classList.add('fg-lib-hidden');
+ deck.classList.add('fg-lib-hidden');
+ loading.classList.add('fg-lib-hidden');
+ empty.classList.remove('fg-lib-hidden');empty.replaceChildren();
+ heading.textContent='Native TeraBox';
+ const panel=E('div','fg-tb-setup');
+ const head=E('h2','','Connect your TeraBox');
+ const desc=E('p','','Paste your ndus session cookie. It stays encrypted on this phone. Direct cloud browsing works without RoundSync or a PC.');
+ const input=E('input','fg-tb-cookie');
+ input.type='password';input.autocomplete='off';input.spellcheck=false;
+ input.placeholder='ndus cookie';input.setAttribute('aria-label','TeraBox ndus cookie');
+ const info=E('p','fg-tb-status','');
+ const save=b('Connect securely','fg-lib-primary',()=>{
+   if(!bridge()?.setTeraboxCookie?.(input.value.trim())){
+     info.textContent='Invalid cookie format. Paste only the ndus value or ndus=…';
+     return;
+   }
+   input.value='';cloudMode=true;currentFolder='';stack=[];
+   show();
+ });
+ const local=b('Local library','fg-lib-secondary',()=>{
+   cloudMode=false;currentFolder='';stack=[];show();
+ });
+ const disconnect=b('Disconnect TeraBox','fg-lib-secondary',()=>{
+   bridge()?.disconnectTerabox?.();cloudMode=false;currentFolder='';stack=[];
+   show();
+ });
+ panel.append(head,desc,input,info,save,local);
+ if(bridge()?.getTeraboxConfigured?.())panel.append(disconnect);
+ empty.append(panel);
+}
+const tbStyles=E('style','');
+tbStyles.textContent=[
+'.fg-tb-setup{display:flex;flex-direction:column;gap:14px;max-width:580px;margin:24px auto;padding:24px;border-radius:20px;background:#182235;border:1px solid #3e526d;color:#eff4ff}',
+'.fg-tb-setup h2{margin:0;font:700 24px/1.2 system-ui}',
+'.fg-tb-setup p{margin:0;font:14px/1.5 system-ui;color:#bcc9da}',
+'.fg-tb-setup .fg-tb-cookie{width:100%;box-sizing:border-box;padding:16px;border-radius:12px;background:#0c1321;border:1px solid #677994;color:#fff;font:15px system-ui;min-height:52px}',
+'.fg-lib-actions [aria-pressed=true]{border-color:#8eacff!important;background:#344c76!important}'
+].join('\n');
+document.head.append(tbStyles);
 function showEmpty(){
  loaded=false;entries=[];deck.replaceChildren();loading.classList.add('fg-lib-hidden');
  welcome.classList.remove('fg-lib-hidden');toolbar.classList.add('fg-lib-hidden');
@@ -523,8 +602,11 @@ function show(){
  document.getElementById('home')?.classList.add('hidden');
  document.getElementById('work')?.classList.add('hidden');
  document.body.classList.remove('fg-book-mode','fg-pdf-reading','fg-unified-reading');
- if(!bridge()?.getLibraryRoot?.()){showEmpty();return;}
+ if(!cloudMode&&!bridge()?.getLibraryRoot?.()){showEmpty();return;}
  welcome.classList.add('fg-lib-hidden');toolbar.classList.remove('fg-lib-hidden');
+ tbBtn.setAttribute('aria-pressed',cloudMode?'true':'false');
+ collectionBtn.setAttribute('aria-pressed',cloudMode?'false':'true');
+ heading.textContent=cloudMode?'TeraBox':'Your library';
  filters.classList.remove('fg-lib-hidden');
  createFilters();
  request();
@@ -651,9 +733,10 @@ window.FileGestionerLibrary={
        bridge()?.finishImageCollection?.();imagePumpState=null;return;
      }
      const batch=state.siblings.slice(state.offset,state.offset+64)
-       .map(x=>({uri:x.uri,name:x.name}));
+       .map(x=>state.terabox?{path:x.path,name:x.name}:{uri:x.uri,name:x.name});
      state.offset+=64;
-     bridge()?.appendImageCollectionChunk?.(JSON.stringify(batch));
+     if(state.terabox)bridge()?.appendTeraboxImageCollectionChunk?.(JSON.stringify(batch));
+     else bridge()?.appendImageCollectionChunk?.(JSON.stringify(batch));
      setTimeout(feed,0);
    };
    state.feed=feed;
