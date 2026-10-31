@@ -39,8 +39,11 @@ public final class ReaderLibrary {
             DocumentsContract.Document.COLUMN_LAST_MODIFIED};
         Cursor cursor=null;
         Exception queryError=null;
-        // Some cloud DocumentProviders (including proxy providers) reject
-        // optional metadata columns, or return null for tree-scoped queries.
+        int emptyReplies=0;
+        // A cloud proxy may return a valid but empty Cursor for tree URIs
+        // after a fixed timeout. That is not proof the folder is empty.
+        // Retry the direct children URI and reduced projection before
+        // displaying an empty folder, keeping first-row streaming intact.
         for(int attempt=0;attempt<4&&cursor==null;attempt++){
             Uri target=attempt<2?treeChildren:
                 DocumentsContract.buildChildDocumentsUri(tree.getAuthority(),id);
@@ -48,14 +51,32 @@ public final class ReaderLibrary {
                 DocumentsContract.Document.COLUMN_DOCUMENT_ID,
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                 DocumentsContract.Document.COLUMN_MIME_TYPE};
+            long started=android.os.SystemClock.elapsedRealtime();
+            Cursor candidate=null;
             try{
-                cursor=ctx.getContentResolver().query(target,cols,null,null,null);
+                candidate=ctx.getContentResolver().query(target,cols,null,null,null);
+                if(candidate!=null&&candidate.moveToFirst()){
+                    cursor=candidate;
+                    candidate=null;
+                    android.util.Log.i("FG_FOLDER","SAF_CHILDREN_SELECTED method="+
+                        (attempt<2?"tree":"direct")+" projection="+
+                        (attempt%2==0?"full":"minimal")+" elapsed_ms="+
+                        (android.os.SystemClock.elapsedRealtime()-started));
+                }else if(candidate!=null){
+                    emptyReplies++;
+                    android.util.Log.w("FG_FOLDER","SAF_CHILDREN_EMPTY method="+
+                        (attempt<2?"tree":"direct")+" projection="+
+                        (attempt%2==0?"full":"minimal")+" elapsed_ms="+
+                        (android.os.SystemClock.elapsedRealtime()-started));
+                }
             }catch(Exception e){queryError=e;}
+            finally{if(candidate!=null)candidate.close();}
         }
         if(cursor==null){
             throw new java.io.IOException(
-                "The document provider could not list this directory"+
-                (queryError!=null?": "+queryError.getMessage():" (empty response)"),
+                "Storage provider returned no folder entries after "+emptyReplies+
+                " empty responses. The cloud folder may be inaccessible"+
+                (queryError!=null?": "+queryError.getMessage():""),
                 queryError);
         }
         int rows=0;
@@ -69,7 +90,7 @@ public final class ReaderLibrary {
             final int ixModified=items.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
             if(ixId<0||ixName<0)throw new java.io.IOException(
                 "Storage provider omitted file ID or name");
-            while(items.moveToNext()){
+            do{
                 if(items.isNull(ixId)||items.isNull(ixName))continue;
                 final String did=items.getString(ixId),name=items.getString(ixName);
                 if(name==null||name.isBlank()||did==null||did.isBlank())continue;
@@ -91,7 +112,7 @@ public final class ReaderLibrary {
                     firstBatch=false;
                     batch=new JSONArray();
                 }
-            }
+            }while(items.moveToNext());
         }
         sink.accept(id,batch,true);
         android.util.Log.i("FG_FOLDER","SAF_METADATA_FINISHED count="+rows+
