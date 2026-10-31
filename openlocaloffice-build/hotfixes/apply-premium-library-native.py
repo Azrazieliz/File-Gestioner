@@ -57,8 +57,9 @@ once('''                    String assetPath=u.getPath();
                     if(assetPath!=null&&imageStreamToken!=null&&''')
 once('''        if (requestCode == REQ_OPEN) {''','''        if(requestCode==REQ_LIBRARY_TREE){
             try{
-                getContentResolver().takePersistableUriPermission(
-                    uri,Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                int granted=Intent.FLAG_GRANT_READ_URI_PERMISSION|
+                    (data==null?0:(data.getFlags()&Intent.FLAG_GRANT_WRITE_URI_PERMISSION));
+                getContentResolver().takePersistableUriPermission(uri,granted);
                 libraryTree=uri;
                 getSharedPreferences("library",MODE_PRIVATE).edit()
                     .putString("tree",uri.toString()).apply();
@@ -84,6 +85,7 @@ once('''        if (requestCode == REQ_OPEN) {''','''        if(requestCode==REQ
 once('''    private void openUri(Uri uri) {''','''    private void selectLibraryFolder(){
         Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|
+            Intent.FLAG_GRANT_WRITE_URI_PERMISSION|
             Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
         startActivityForResult(intent,REQ_LIBRARY_TREE);
     }
