@@ -230,7 +230,7 @@ s=s.replace(anchor,'''        @JavascriptInterface public void verifyCurrentKoik
                     }
                     if(!token.equals(fgTbToken)||!cloud.equals(fgTbSelectedPath))return;
                     final Uri candidate=Uri.fromFile(file);
-                    final boolean verified=KoikatsuCards.isCharacterCard(this,candidate);
+                    final boolean verified=KoikatsuCards.isCharacterCard(MainActivity.this,candidate);
                     if(verified){
                         currentUri=candidate;fgVerifiedKoikatsuCard=candidate;
                     }else file.delete();
