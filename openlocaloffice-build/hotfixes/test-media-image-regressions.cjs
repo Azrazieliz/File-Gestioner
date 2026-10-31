@@ -8,7 +8,7 @@ const main=fs.readFileSync('app/src/main/java/com/openlocal/office/MainActivity.
 const media=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgMediaPlayer.java','utf8');
 const growing=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgGrowingMediaDataSource.java','utf8');
 assert(!lib.includes("if(item.folder){\n   bridge()?.openImageFolder"),'Folder overlay is still blocking image pages');
-assert(lib.includes("root.classList.add('fg-lib-hidden');\n   visible=false;"),'Folder must hide library before loading');
+assert(lib.includes("enterFolder(item.id);return;"),'Folders must browse normally rather than force image reading');
 assert(js.includes("if(data?.type==='folderImages'||(data?.type==='image'"),'Dedicated image route absent');
 const block=js.slice(js.indexOf("window.loadDocument=function(data){"));
 assert(block.includes("renderImageFolder(data.type==='image'?{") &&
@@ -60,11 +60,25 @@ assert(patchedFolder.includes('@JavascriptInterface public void openImageInFolde
   'Image collection missing JavaScript bridge');
 assert(lib.includes('bridge().openImageInFolder(currentFolder,item.uri)'),
   'Image tile still opens only one file');
-assert(lib.includes("['all','All'],['image','Images']"),
+assert(lib.includes("['all','All files'],['image','Images']"),
   'Dedicated Images filter missing');
 assert(js.includes('fg-image-toolbar')&&!js.includes('requestAnimationFrame(()=>requestAnimationFrame(attach));\n   return;'),
   'Image viewer still shows EPUB controls');
 assert(js.includes('imageMode=data.standalone'), 'Single-image smart-fit mode missing');
 assert(style.includes('.fg-image-reader .fg-image-paged .fg-image-rotated .fg-folder-image'),
   'Landscape pictures still cannot use portrait screen efficiently');
+assert(lib.includes('showFileActions(item)'), 'File-specific action sheet missing');
+assert(lib.includes('sortDescending'), 'Sort order selection missing');
+assert(lib.includes('closeFileActions'), 'Contextual file controls cannot close');
+assert(lib.includes('operationResult'), 'File management result feedback missing');
+assert(lib.includes('lastRender=Date.now()'), 'Cloud listing renders are being starved');
+assert(lib.includes('imageReaderReady'), 'Image collection native handshake missing');
+assert(main.includes('shareLibraryFile'), 'Android file sharing not connected');
+assert(main.includes('openLibraryExternally'), 'Android external-open not connected');
+assert(main.includes('renameLibraryFile'), 'SAF rename not connected');
+assert(main.includes('deleteLibraryFile'), 'SAF delete not connected');
+assert(main.includes('canManageLibraryFiles'), 'SAF write permission guard missing');
+assert(libFile.includes('A file manager must show every regular file'),
+  'Unrecognized extensions must not be filtered out');
+assert(main.includes('requestedFolder'), 'Stale cloud folder results not tagged');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
