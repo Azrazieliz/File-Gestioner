@@ -111,6 +111,9 @@ function openBook(item){
    bridge().beginImageCollection(item.uri);
  }else if(classify(item)==='image' && bridge()?.openImageInFolder){
    bridge().openImageInFolder(currentFolder,item.uri);
+ }else if(classify(item)==='file' && bridge()?.openLibraryExternally){
+   // Never pretend an unknown file can be decoded by a reader.
+   bridge().openLibraryExternally(item.uri);
  }else{
    bridge()?.openLibraryFile?.(item.uri);
  }
@@ -205,6 +208,7 @@ function showFileActions(item){
     kind==='image'?'Read image collection':kind==='comic'?'Read comic archive':
     kind==='archive'?'Open archive':kind==='pdf'?'Read PDF':
     kind==='video'?'Play video fullscreen':kind==='audio'?'Play audio':
+    kind==='file'?'Open with Android':
     kind==='book'?'Read ebook':kind==='model'?'Open 3D asset':
     /\.(csv|xlsx|xls)$/i.test(item.name)?'Edit spreadsheet':'Open file';
  fileAction(sheet,openLabel,'Use the matching file viewer',()=>{
