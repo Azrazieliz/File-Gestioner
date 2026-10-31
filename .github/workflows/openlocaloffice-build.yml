@@ -300,6 +300,10 @@ jobs:
 
       # Release artifacts are signed with the existing identity only.
       # Do not generate debug keys or an unsigned APK and call it a release.
+      - name: Build release APK
+        working-directory: openlocaloffice-build/project
+        run: gradle assembleRelease --stacktrace
+
       - name: Validate existing release signing credentials
         shell: bash
         env:
@@ -316,10 +320,6 @@ jobs:
               exit 1
             fi
           done
-
-      - name: Build release APK
-        working-directory: openlocaloffice-build/project
-        run: gradle assembleRelease --stacktrace
 
       - name: Sign and verify release with preserved signing identity
         shell: bash
