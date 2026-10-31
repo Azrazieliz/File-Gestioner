@@ -461,6 +461,7 @@ function request(){
  activeVersion=null;scanning=true;pageStart=0;entries=[];loaded=false;
  listingRequest=currentFolder||'';lastRender=0;
  if(renderTimer){clearTimeout(renderTimer);renderTimer=0;}
+ loading.textContent='Loading your collection…';
  loading.classList.remove('fg-lib-hidden');deck.classList.add('fg-lib-hidden');
  empty.classList.add('fg-lib-hidden');
  bridge()?.listLibrary?.(currentFolder);
@@ -584,6 +585,13 @@ function receive(payload){
  welcome.classList.add('fg-lib-hidden');toolbar.classList.remove('fg-lib-hidden');
  filters.classList.remove('fg-lib-hidden');render();
 }
+function loadingStatus(message){
+ if(!visible)return;
+ loading.classList.remove('fg-lib-hidden');
+ loading.textContent=message||'Waiting for cloud directory metadata…';
+ deck.classList.add('fg-lib-hidden');
+ empty.classList.add('fg-lib-hidden');
+}
 function error(message){
  // Errors during image-folder opening must be visible, not trapped behind
  // the hidden library and an empty reader.
@@ -631,7 +639,7 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,hideForReader,receive,append,error,operationResult,transferProgress,handleBack:handleAndroidBack,enterFolder,openSibling,
+ show,hideForReader,receive,append,error,loadingStatus,operationResult,transferProgress,handleBack:handleAndroidBack,enterFolder,openSibling,
  imageReaderReady:()=>{
    const state=imagePumpState;
    if(!state||state.started||state.version!==imagePumpVersion)return;
