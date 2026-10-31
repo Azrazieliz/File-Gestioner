@@ -143,5 +143,74 @@ body.fg-folder-reading #editor{height:100dvh!important;min-height:0!important;
 .fg-image-reader .fg-folder-sentinel{border:0;background:#000;color:#b6bdcc;
  padding:4px 0;min-height:10px;line-height:1.2}
 """
+
+style+=r"""
+/* File-specific professional control sheet and responsive library controls. */
+.fg-library-root .fg-lib-toolbar{flex-wrap:wrap;row-gap:9px;column-gap:8px}
+.fg-library-root .fg-lib-sort{padding:8px 9px;min-height:38px;max-width:116px;
+ white-space:nowrap;text-overflow:ellipsis;overflow:hidden;
+ border-radius:10px;background:#242d41;border:1px solid #445471;color:#e8eeff;
+ font:650 11px system-ui;touch-action:manipulation}
+.fg-library-root .fg-lib-search{min-width:0;flex:0 1 180px}
+.fg-library-root .fg-lib-tile{position:relative}
+.fg-library-root .fg-lib-more{position:absolute;right:5px;top:5px;z-index:7;
+ display:grid;place-items:center;width:34px;height:34px;min-width:34px;
+ background:#10182bdd;color:#eef4ff;border:1px solid #65728b99;
+ border-radius:11px;backdrop-filter:blur(14px);font:800 23px/1 system-ui;
+ touch-action:manipulation}
+.fg-library-root .fg-lib-more:active{background:#485d88}
+.fg-library-root .fg-lib-tile:focus-within .fg-lib-cover{
+ outline:1px solid #849bff88;outline-offset:2px}
+.fg-library-root .fg-lib-list .fg-lib-more{position:static;flex:0 0 36px}
+.fg-file-sheet-overlay{position:fixed;inset:0;z-index:20000;background:#030811ad;
+ display:flex;align-items:flex-end;justify-content:center;padding:0 0 env(safe-area-inset-bottom,0px);
+ backdrop-filter:blur(5px)}
+.fg-file-sheet{box-sizing:border-box;width:min(100%,520px);max-height:88dvh;
+ overflow-y:auto;overscroll-behavior:contain;padding:16px 16px 22px;
+ background:linear-gradient(155deg,#202b40,#121a2a 76%);
+ color:#eff4ff;border:1px solid #5e73964d;border-radius:22px 22px 0 0;
+ box-shadow:0 -18px 70px #0009;font-family:system-ui}
+.fg-file-sheet-head{display:flex;align-items:center;gap:14px;
+ justify-content:space-between;padding-bottom:13px;border-bottom:1px solid #ffffff20}
+.fg-file-sheet-head strong{font:750 17px/1.4 system-ui;
+ overflow-wrap:anywhere;max-height:3.5em;overflow:hidden}
+.fg-file-sheet-close{flex:0 0 40px;width:40px;height:40px;background:#304058;
+ border:1px solid #546784;color:#fff;border-radius:11px;font-size:25px}
+.fg-file-sheet-subtitle{font:13px/1.5 system-ui;color:#a9bad4;margin:12px 0}
+.fg-file-action{width:100%;display:flex;flex-direction:column;gap:4px;
+ align-items:flex-start;justify-content:center;text-align:left;
+ padding:13px 14px;margin:6px 0;border-radius:13px;border:1px solid #42516b87;
+ color:#f0f5ff;background:#28354b;font:650 14px/1.3 system-ui;
+ min-height:52px;touch-action:manipulation}
+.fg-file-action:active{background:#425775}
+.fg-file-action:disabled{opacity:.38;cursor:not-allowed}
+.fg-file-action-description{color:#a8b8d1;font:400 11px/1.4 system-ui}
+.fg-file-danger{border-color:#a25d6888;color:#ffc5c9;background:#442b38}
+.fg-file-danger .fg-file-action-description{color:#e6a6b0}
+.fg-file-name-input{box-sizing:border-box;width:100%;font:500 16px system-ui;
+ background:#121d2e;color:#fff;border:1px solid #7284a5;border-radius:10px;
+ padding:12px;margin:13px 0}
+.fg-file-details{display:grid;grid-template-columns:95px 1fr;gap:10px 12px;
+ padding:13px 0;line-height:1.4;font-size:13px}
+.fg-file-details dt{color:#91a4c2}.fg-file-details dd{margin:0;overflow-wrap:anywhere}
+.fg-file-write-note{font:12px/1.5 system-ui;color:#b2c0d6;margin:13px 3px}
+.fg-file-delete-name{font:650 14px/1.5 system-ui;overflow-wrap:anywhere}
+.fg-file-toast{position:fixed;bottom:max(24px,env(safe-area-inset-bottom,0px));
+ left:50%;transform:translateX(-50%);width:min(92vw,480px);
+ z-index:24000;background:#344665;color:#fff;border:1px solid #7084b0;
+ border-radius:12px;padding:13px 16px;box-shadow:0 12px 28px #0007;
+ font:600 13px system-ui;text-align:center}
+@media(max-width:560px){
+ .fg-library-root .fg-lib-toolbar{display:grid;grid-template-columns:34px 1fr 92px 38px;
+  align-items:center;padding-top:13px}
+ .fg-library-root .fg-lib-head-info{grid-column:2/4;grid-row:1;min-width:0}
+ .fg-library-root .fg-lib-nav-back{grid-row:1;grid-column:1}
+ .fg-library-root .fg-lib-search{grid-row:2;grid-column:1/3;width:100%;max-width:none}
+ .fg-library-root .fg-lib-sort{grid-row:2;grid-column:3;max-width:92px}
+ .fg-library-root .fg-lib-icon{grid-column:4;grid-row:2}
+ .fg-file-sheet{border-radius:19px 19px 0 0}
+}
+"""
+
 css.write_text(style)
 print("Shared reader dock + paged mode + colors/fonts + zoomable EPUB illustrations + image-folder layout enabled")
