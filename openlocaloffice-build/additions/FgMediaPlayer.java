@@ -132,7 +132,8 @@ public final class FgMediaPlayer implements AutoCloseable {
         status.setTextSize(13);
         status.setBackgroundColor(0xbb101827);
         status.setPadding(14,12,14,12);
-        root.addView(status,new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM));
+        root.addView(status,new FrameLayout.LayoutParams(
+            video?-2:-1,-2,video?(Gravity.TOP|Gravity.CENTER_HORIZONTAL):Gravity.BOTTOM));
         player.addListener(new Player.Listener(){
             @Override public void onPlaybackStateChanged(int state){
                 if(closed)return;
@@ -190,8 +191,12 @@ public final class FgMediaPlayer implements AutoCloseable {
     private void showMessage(String message){
         activity.runOnUiThread(()->{
             if(closed)return;
-            status.setText(message);
-            status.setVisibility(message.isEmpty()?View.GONE:View.VISIBLE);
+            // Download progress must not cover the video seek bar or remain
+            // visible throughout normal progressive playback.
+            String shown=video && player.getPlaybackState()==Player.STATE_READY &&
+                message.startsWith("Streaming ")?"":message;
+            status.setText(shown);
+            status.setVisibility(shown.isEmpty()?View.GONE:View.VISIBLE);
         });
     }
     private void play(Uri uri){
