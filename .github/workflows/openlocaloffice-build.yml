@@ -260,7 +260,7 @@ jobs:
           set -euo pipefail
           node --check app/src/main/assets/app.js
           node --check app/src/main/assets/universal-reader.js
-          # Android-only renderer sources compile with Android SDK during assembleDebug.
+          # Android-only renderer sources compile with Android SDK during assembleRelease.
           # Existing JVM-only source harness remains executed before installation.
           grep -q 'android.intent.action.VIEW' app/src/main/AndroidManifest.xml
           grep -q 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' app/src/main/AndroidManifest.xml
@@ -296,52 +296,83 @@ jobs:
             openlocaloffice-build/project/app/src/main/AndroidManifest.xml
           retention-days: 1
 
-      - name: Build debug APK
-        working-directory: openlocaloffice-build/project
-        run: gradle assembleDebug --stacktrace
+      # Release artifacts are signed with the existing identity only.
+      # Do not generate debug keys or an unsigned APK and call it a release.
+      - name: Validate existing release signing credentials
+        shell: bash
+        env:
+          FG_RELEASE_KEYSTORE_BASE64: ${{ secrets.FG_RELEASE_KEYSTORE_BASE64 }}
+          FG_RELEASE_STORE_PASSWORD: ${{ secrets.FG_RELEASE_STORE_PASSWORD }}
+          FG_RELEASE_KEY_ALIAS: ${{ secrets.FG_RELEASE_KEY_ALIAS }}
+          FG_RELEASE_KEY_PASSWORD: ${{ secrets.FG_RELEASE_KEY_PASSWORD }}
+          FG_RELEASE_CERT_SHA256: ${{ secrets.FG_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          for name in FG_RELEASE_KEYSTORE_BASE64 FG_RELEASE_STORE_PASSWORD FG_RELEASE_KEY_ALIAS FG_RELEASE_KEY_PASSWORD FG_RELEASE_CERT_SHA256; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Existing release signing configuration is missing: $name. No debug or substitute signing identity will be used."
+              exit 1
+            fi
+          done
 
-      - name: Upload APK
+      - name: Build release APK
+        working-directory: openlocaloffice-build/project
+        run: gradle assembleRelease --stacktrace
+
+      - name: Sign and verify release with preserved signing identity
+        shell: bash
+        env:
+          FG_RELEASE_KEYSTORE_BASE64: ${{ secrets.FG_RELEASE_KEYSTORE_BASE64 }}
+          FG_RELEASE_STORE_PASSWORD: ${{ secrets.FG_RELEASE_STORE_PASSWORD }}
+          FG_RELEASE_KEY_ALIAS: ${{ secrets.FG_RELEASE_KEY_ALIAS }}
+          FG_RELEASE_KEY_PASSWORD: ${{ secrets.FG_RELEASE_KEY_PASSWORD }}
+          FG_RELEASE_CERT_SHA256: ${{ secrets.FG_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          umask 077
+          temp_key="$(mktemp)"
+          trap 'rm -f "$temp_key"' EXIT
+          printf '%s' "$FG_RELEASE_KEYSTORE_BASE64" | base64 --decode > "$temp_key"
+          unsigned="openlocaloffice-build/project/app/build/outputs/apk/release/app-release-unsigned.apk"
+          test -s "$unsigned" || { echo "::error::Unsigned release artifact is missing; refusing to re-sign any debug artifact."; exit 1; }
+          destination="openlocaloffice-build/project/app/build/outputs/apk/release/app-release-signed.apk"
+          signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$signer" sign --ks "$temp_key" --ks-type PKCS12 \
+            --ks-key-alias "$FG_RELEASE_KEY_ALIAS" \
+            --ks-pass env:FG_RELEASE_STORE_PASSWORD \
+            --key-pass env:FG_RELEASE_KEY_PASSWORD \
+            --out "$destination" "$unsigned"
+          "$signer" verify --verbose --print-certs "$destination"
+          actual="$("$signer" verify --print-certs "$destination" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n1 | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+          expected="$(printf '%s' "$FG_RELEASE_CERT_SHA256" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+          if [[ -z "$actual" || "$actual" != "$expected" ]]; then
+            rm -f "$destination"
+            echo "::error::Release signing certificate differs from the approved installed identity."
+            exit 1
+          fi
+          echo "Signed release certificate verified against approved fingerprint."
+
+      - name: Upload signed release APK
         uses: actions/upload-artifact@v4
         with:
-          name: File-Gestioner-debug-apk
-          path: openlocaloffice-build/project/app/build/outputs/apk/debug/app-debug.apk
+          name: File-Gestioner-signed-release-apk
+          path: openlocaloffice-build/project/app/build/outputs/apk/release/app-release-signed.apk
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
 
-      # Runtime is a required gate for both main and pull requests.
-      - name: Publish debug APK for connected-device install
+      - name: Publish signed release candidate
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          tag="file-gestioner-debug-${{ github.run_number }}"
-          gh release create "$tag" openlocaloffice-build/project/app/build/outputs/apk/debug/app-debug.apk \
+          tag="file-gestioner-release-${{ github.run_number }}"
+          gh release create "$tag" openlocaloffice-build/project/app/build/outputs/apk/release/app-release-signed.apk \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "File Gestioner debug build ${{ github.run_number }}" \
-            --notes "Development APK; Android device verification is required. Do not treat as stable." \
+            --title "File Gestioner signed release candidate ${{ github.run_number }}" \
+            --notes "Signed release candidate using the preserved File Gestioner signing certificate. Device regression testing required before production rollout." \
             --prerelease
-
-      - name: Build separate preview package without overwriting the installed app
-        working-directory: openlocaloffice-build/project
-        shell: bash
-        run: |
-          set -euo pipefail
-          cp app/build/outputs/apk/debug/app-debug.apk /tmp/file-gestioner-original.apk
-          python3 ../hotfixes/enable-side-by-side-preview.py
-          gradle assembleDebug --stacktrace
-          cp app/build/outputs/apk/debug/app-debug.apk /tmp/app-preview-debug.apk
-          cp /tmp/file-gestioner-original.apk app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Publish preview APK for safe separate phone installation
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          tag="file-gestioner-debug-${{ github.run_number }}"
-          gh release upload "$tag" /tmp/app-preview-debug.apk --repo "${{ github.repository }}" --clobber
 
       - name: Enable emulator acceleration
         shell: bash
