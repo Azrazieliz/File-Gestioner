@@ -28,13 +28,15 @@ MAX_SOURCE=256*1024*1024
 def is_koikatsu_card(payload):
     if not payload.startswith(b"\x89PNG\r\n\x1a\n"):return False
     i=8
-    while i+12<=len(payload) and i<50_000_000:
+    while i+12<=len(payload) and i<MAX_SOURCE:
         size=int.from_bytes(payload[i:i+4],"big");kind=payload[i+4:i+8]
-        if size>45_000_000 or i+12+size>len(payload):return False
+        if size>MAX_SOURCE or i+12+size>len(payload):return False
         i+=size+12
         if kind==b"IEND":
-            trailer=payload[i:i+4096]
-            return b"KoiKatuChara" in trailer or b"KoikatsuChara" in trailer
+            trailer=payload[i:i+256*1024]
+            return any(marker in trailer for marker in
+                       (b"KoiKatuChara",b"KoikatsuChara",
+                        b"KoiKatuCharaSunshine",b"KoiKatuCharaFile"))
     return False
 
 def studio_ws(data,timeout=12):
