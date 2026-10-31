@@ -300,9 +300,16 @@ jobs:
 
       # Release artifacts are signed with the existing identity only.
       # Do not generate debug keys or an unsigned APK and call it a release.
+      - name: Normalize approved launcher assets for release
+        working-directory: openlocaloffice-build/project
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ../hotfixes/normalize-release-icons.py
+
       - name: Build release APK
         working-directory: openlocaloffice-build/project
-        run: gradle assembleRelease --stacktrace
+        run: gradle --no-daemon --max-workers=2 assembleRelease --stacktrace
 
       - name: Validate existing release signing credentials
         shell: bash
