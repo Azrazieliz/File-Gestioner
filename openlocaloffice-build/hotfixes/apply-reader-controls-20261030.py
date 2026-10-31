@@ -125,7 +125,7 @@ body.fg-folder-reading #editor{height:100dvh!important;min-height:0!important;
  width:100dvh!important;height:100vw!important;max-width:none!important;
  max-height:none!important;transform:translate(-50%,-50%) rotate(90deg)!important;
  object-fit:contain!important}
-.fg-image-toolbar{position:absolute;z-index:9990;bottom:max(4px,env(safe-area-inset-bottom,0px));
+.fg-image-toolbar{position:absolute;z-index:9990;bottom:max(46px,env(safe-area-inset-bottom,0px));
  left:50%;transform:translateX(-50%);width:min(98%,480px);
  display:flex;gap:4px;align-items:center;padding:5px 7px;border-radius:11px;
  background:#0b1029d9;border:1px solid #59668388;color:#fff;
