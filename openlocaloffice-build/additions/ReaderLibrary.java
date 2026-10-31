@@ -20,6 +20,12 @@ public final class ReaderLibrary {
         Listing(String folder,JSONArray items){this.folder=folder;this.items=items;}
     }
     private ReaderLibrary(){}
+    public static final class PendingDirectoryException extends java.io.IOException {
+        public final boolean loading;
+        public PendingDirectoryException(boolean loading,String message){
+            super(message);this.loading=loading;
+        }
+    }
     /** Emit bounded metadata batches while a SAF provider is still enumerating.
      * No 500-file ceiling, no up-front cover downloads, no all-files JSON.
      * Providers that yield cursor rows incrementally show the first batch early.
@@ -37,48 +43,46 @@ public final class ReaderLibrary {
             DocumentsContract.Document.COLUMN_MIME_TYPE,
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED};
+        // RoundSync's DocumentsProvider returns an empty ExtrasMatrixCursor
+        // with EXTRA_LOADING or EXTRA_ERROR when its rclone request times
+        // out. It is not evidence that an image directory is empty.
         Cursor cursor=null;
-        Exception queryError=null;
-        int emptyReplies=0;
-        // A cloud proxy may return a valid but empty Cursor for tree URIs
-        // after a fixed timeout. That is not proof the folder is empty.
-        // Retry the direct children URI and reduced projection before
-        // displaying an empty folder, keeping first-row streaming intact.
-        for(int attempt=0;attempt<4&&cursor==null;attempt++){
-            Uri target=attempt<2?treeChildren:
-                DocumentsContract.buildChildDocumentsUri(tree.getAuthority(),id);
-            String[] cols=attempt%2==0?projection:new String[]{
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                DocumentsContract.Document.COLUMN_MIME_TYPE};
-            long started=android.os.SystemClock.elapsedRealtime();
-            Cursor candidate=null;
-            try{
-                candidate=ctx.getContentResolver().query(target,cols,null,null,null);
-                if(candidate!=null&&candidate.moveToFirst()){
-                    cursor=candidate;
-                    candidate=null;
-                    android.util.Log.i("FG_FOLDER","SAF_CHILDREN_SELECTED method="+
-                        (attempt<2?"tree":"direct")+" projection="+
-                        (attempt%2==0?"full":"minimal")+" elapsed_ms="+
-                        (android.os.SystemClock.elapsedRealtime()-started));
-                }else if(candidate!=null){
-                    emptyReplies++;
-                    android.util.Log.w("FG_FOLDER","SAF_CHILDREN_EMPTY method="+
-                        (attempt<2?"tree":"direct")+" projection="+
-                        (attempt%2==0?"full":"minimal")+" elapsed_ms="+
-                        (android.os.SystemClock.elapsedRealtime()-started));
+        boolean isRoundSync="de.felixnuesse.extract.vcp".equals(tree.getAuthority());
+        String providerError=null;
+        boolean providerLoading=false;
+        final long started=android.os.SystemClock.elapsedRealtime();
+        try {
+            cursor=ctx.getContentResolver().query(treeChildren,projection,null,null,null);
+            if(cursor!=null){
+                android.os.Bundle extras=cursor.getExtras();
+                if(extras!=null){
+                    providerLoading=extras.getBoolean(DocumentsContract.EXTRA_LOADING,false);
+                    providerError=extras.getString(DocumentsContract.EXTRA_ERROR);
                 }
-            }catch(Exception e){queryError=e;}
-            finally{if(candidate!=null)candidate.close();}
+            }
+            if(cursor==null){
+                throw new java.io.IOException("Storage provider did not return a cursor");
+            }
+            if(!cursor.moveToFirst()){
+                cursor.close();cursor=null;
+                String hint=providerError==null?"Provider returned no results":providerError;
+                android.util.Log.w("FG_FOLDER","SAF_EMPTY status="+
+                    (providerLoading?"loading":"not-loading")+" elapsed_ms="+
+                    (android.os.SystemClock.elapsedRealtime()-started)+
+                    " authority="+tree.getAuthority()+" providerMessage="+hint);
+                if(isRoundSync && (providerLoading||providerError!=null)){
+                    throw new PendingDirectoryException(providerLoading,
+                        "RoundSync is still loading or could not list this cloud folder: "+hint);
+                }
+                sink.accept(id,new JSONArray(),true);
+                return new Listing(id,new JSONArray());
+            }
+        }catch(Exception e){
+            if(cursor!=null)cursor.close();
+            throw e;
         }
-        if(cursor==null){
-            throw new java.io.IOException(
-                "Storage provider returned no folder entries after "+emptyReplies+
-                " empty responses. The cloud folder may be inaccessible"+
-                (queryError!=null?": "+queryError.getMessage():""),
-                queryError);
-        }
+        android.util.Log.i("FG_FOLDER","SAF_CHILDREN_SELECTED method=tree"+
+            " elapsed_ms="+(android.os.SystemClock.elapsedRealtime()-started));
         int rows=0;
         JSONArray batch=new JSONArray();
         boolean firstBatch=true;
