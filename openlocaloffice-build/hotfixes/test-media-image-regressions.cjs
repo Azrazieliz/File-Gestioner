@@ -99,4 +99,17 @@ assert(app.includes("doc.format==='xlsx'?1048576:100000"),
   'Full spreadsheet row navigation is still artificially capped');
 assert(style.includes('body.fg-spreadsheet-reading .bar'),
   'Spreadsheet must avoid the Android status bar');
+const remote=fs.readFileSync('app/src/main/assets/fg-remote-ui.js','utf8');
+assert(js.includes("if(data?.type==='folderImages'||data?.type==='image')"),
+  'Direct Koikatsu PNG must use dedicated image reader and never EPUB controls');
+assert(js.includes("koikatsuCard:data.koikatsuCard===true"),
+  'Native Koikatsu marker must carry through to image-specific 3D action');
+assert(js.includes("window.AndroidBridge?.returnToExternalFile?.()"),
+  'Files/RoundSync external image back navigation missing');
+assert(main.includes('boolean returnToExternalFile()'),
+  'Native Android external file origin handling missing');
+assert(remote.includes('if(data.error&&!data.session)'),
+  'Async Koikatsu pending sessions still terminate before rendering');
+assert(remote.includes("frame.hidden=true"),
+  'PC viewer still shows broken-image icon instead of loading state');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
