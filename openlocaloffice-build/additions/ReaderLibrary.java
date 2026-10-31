@@ -44,7 +44,7 @@ public final class ReaderLibrary {
                 String did=cursor.getString(0),name=cursor.getString(1),mime=cursor.getString(2);
                 if(name==null||did==null||mime==null)continue;
                 boolean folder=DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
-                if(!folder&&!supported(name.toLowerCase(Locale.ROOT)))continue;
+                // A file manager must show every regular file, not just the reader whitelist.
                 JSONObject item=new JSONObject();
                 item.put("id",did).put("title",stripExtension(name))
                     .put("name",name).put("mime",mime)
@@ -83,7 +83,7 @@ public final class ReaderLibrary {
                 if(name==null||did==null||mime==null)continue;
                 boolean folder=DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
                 String lower=name.toLowerCase(Locale.ROOT);
-                if(!folder&&!supported(lower))continue;
+                // Even unsupported file types must remain visible in directory listings.
                 JSONObject item=new JSONObject();
                 item.put("id",did).put("title",stripExtension(name))
                     .put("name",name).put("mime",mime)
