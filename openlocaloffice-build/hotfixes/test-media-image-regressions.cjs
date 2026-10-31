@@ -36,4 +36,19 @@ assert(libFile.includes('if(batch.length()>=96)'),'Directory chunking missing');
 assert(!libFile.includes('if(++total>=PAGE_SIZE)break;') ||
        main.includes('ReaderLibrary.stream(this,root,folder'),
        'Library still truncates folders at 500 files');
+// The native folder reader is not the generic loader: it must reveal #editor.
+assert(js.includes("editor.classList.remove('hidden');"),'Image folder editor stays hidden');
+assert(js.includes("editor.style.display='block'"),'Image folder may retain display:none');
+const folderPatch=fs.readFileSync('../hotfixes/apply-streamed-image-folders-20261031.py','utf8');
+assert(folderPatch.includes("DocumentsContract.getTreeDocumentId(libraryTree)"),
+  'Folder access still depends on transient listing state');
+const style=fs.readFileSync('app/src/main/assets/style.css','utf8');
+assert(style.includes('display:block!important;height:100%!important;min-height:0!important'),
+  'Folder editor does not fill the reading viewport');
+assert(media.includes('SCREEN_ORIENTATION_SENSOR_LANDSCAPE'),'Video must rotate to landscape');
+assert(media.includes('SYSTEM_UI_FLAG_IMMERSIVE_STICKY'),'Video must hide system bars');
+assert(media.includes('direction*10000L'),'Left/right double tap must skip ten seconds');
+assert(media.includes('setShowRewindButton(false)')&&media.includes('setShowFastForwardButton(false)'),
+  'Video must remove old ten-second buttons');
+assert(media.includes('if(video)leaveVideoFullscreen()'),'Video must restore normal orientation');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
