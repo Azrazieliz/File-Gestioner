@@ -33,7 +33,7 @@ wait_for_log() {
   return 1
 }
 
-adb install -r openlocaloffice-build/project/app/build/outputs/apk/debug/app-debug.apk
+adb install -r openlocaloffice-build/project/app/build/outputs/apk/release/app-release-signed.apk
 adb logcat -c
 adb shell am start -n com.openlocal.office/.MainActivity
 wait_for_log FG_READER_UI 'LIBRARY_READY' 90
