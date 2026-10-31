@@ -17,7 +17,7 @@ const el=(tag,cls,text)=>{
 const setStatus=t=>{if(status)status.textContent=t;};
 const token=()=>String(bridge()?.getRemoteToken?.()||'').trim();
 async function api(path,opts={}){
-  const auth=token();if(!auth)throw Error('Pair this phone with the PC first.');
+  const auth=token();if(!auth)throw Error('PC USB connection is not configured. Connect the paired PC.');
   const resp=await fetch(URL_ROOT+path,{...opts,headers:{...(opts.headers||{}),'X-FG-Token':auth},cache:'no-store'});
   if(!resp.ok){
     let details='';try{details=(await resp.json()).error||''}catch(_){}
@@ -72,25 +72,21 @@ function open(nextKind='cube'){
     kind==='blend'?'Blender · PC Native Scene':'Blender · Independent Cube'));
   const closeButton=el('button','fg-pc-close','Close');
   closeButton.onclick=close;head.append(closeButton);overlay.append(head);
-  const pair=el('div','fg-pc-pair');
-  const input=el('input','fg-pc-token');
-  input.type='password';input.placeholder='PC pairing token (first connection)';
-  input.value=token();
-  const save=el('button','fg-pc-action','Pair');
-  save.onclick=()=>{bridge()?.setRemoteToken?.(input.value.trim());setStatus('Pairing saved only on this phone.');};
-  pair.append(input,save);overlay.append(pair);
+  // The paired PC is retained privately in Android preferences.
+  // Do not show the token, password field, or recurring Pair prompts.
   viewport=el('div','fg-pc-viewport');
   frame=el('img','fg-pc-frame');frame.alt='Remote native 3D scene';
   frame.draggable=false;viewport.append(frame);overlay.append(viewport);
   status=el('div','fg-pc-status','Not connected');
   overlay.append(status);
   const actions=el('div','fg-pc-actions');
-  const connect=el('button','fg-pc-action','Open on PC');
-  connect.onclick=()=>{
-    if(input.value.trim()!==token())bridge()?.setRemoteToken?.(input.value.trim());
-    setStatus('Connecting to PC…');
+  const connect=el('button','fg-pc-action','Reconnect');
+  const connectNow=()=>{
+    setStatus('Opening on connected PC…');
+    if(!token()){setStatus('PC link unavailable. Connect the authorized USB bridge.');return;}
     try{bridge()?.remoteOpen3D?.(kind);}catch(e){setStatus(String(e));}
   };
+  connect.onclick=connectNow;
   const reset=el('button','fg-pc-action','Reset view');
   reset.onclick=()=>{yaw=.4;pitch=.2;distance=2.5;requestFrame();};
   actions.append(connect,reset);overlay.append(actions);
@@ -120,6 +116,9 @@ function open(nextKind='cube'){
   };
   viewport.addEventListener('pointerup',end);viewport.addEventListener('pointercancel',end);
   document.body.append(overlay);
+  // The normal path is automatic, no user Pair or Open action required.
+  if(token())setTimeout(connectNow,0);
+  else setStatus('PC not linked yet. Reconnect the authorized USB bridge.');
 }
 window.FileGestionerRemoteViewer={open,onOpen,close};
 const entry=el('button','fg-pc-entry','PC 3D');
