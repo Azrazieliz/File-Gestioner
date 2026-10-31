@@ -46,7 +46,7 @@ body.append(welcome,toolbar,filters,loading,deck,empty,footer);
 root.append(header,body);
 document.body.insertBefore(root,document.getElementById('busy')||null);
 const categories=[
- ['all','All'],['comic','Comics'],['book','Books'],
+ ['all','All'],['image','Images'],['comic','Comics'],['book','Books'],
  ['document','Documents'],['model','3D assets']
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
@@ -57,6 +57,7 @@ function classify(entry){
  const x=entry.name.toLowerCase();
  if(/\.(cbz|zip|cbr)$/.test(x))return 'comic';
  if(/\.(epub)$/.test(x))return 'book';
+ if(/\.(png|jpe?g|webp|avif|gif|bmp)$/.test(x))return 'image';
  if(/\.(glb|gltf|fbx|obj|vrm|blend|pmx|pmd)$/.test(x))return 'model';
  return 'document';
 }
@@ -68,10 +69,10 @@ function formatSize(n){
 }
 function label(e){
  const c=classify(e);
- return {comic:'WEBTOON',book:'EBOOK',document:'DOCUMENT',model:'3D ASSET',
+ return {comic:'COMIC',image:'IMAGE',book:'EBOOK',document:'DOCUMENT',model:'3D ASSET',
    folder:'COLLECTION'}[c];
 }
-function icon(c){return {comic:'▧',book:'▤',document:'▤',model:'◇',folder:'▣'}[c];}
+function icon(c){return {comic:'▧',image:'▧',book:'▤',document:'▤',model:'◇',folder:'▣'}[c];}
 function tint(name){
  let h=42;for(const ch of name)h=(h*33+ch.charCodeAt(0))>>>0;
  return (h%260)+30;
@@ -93,7 +94,13 @@ function openBook(item){
  visible=false;
  document.getElementById('home')?.classList.add('hidden');
  document.getElementById('work')?.classList.remove('hidden');
- bridge()?.openLibraryFile?.(item.uri);
+ if(classify(item)==='image' && bridge()?.openImageInFolder){
+   // Image tiles open the full collection at the selected picture.
+   // Native SAF supplies siblings progressively, also for Round Sync.
+   bridge().openImageInFolder(currentFolder,item.uri);
+ }else{
+   bridge()?.openLibraryFile?.(item.uri);
+ }
 }
 // Never start five remote archive transfers at once. Image requests run only
 // after the corresponding tile intersects the viewport; each finishes before
