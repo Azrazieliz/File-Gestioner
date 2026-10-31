@@ -19,6 +19,22 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
     private final java.util.concurrent.atomic.AtomicInteger fgImageCollectionCount=
         new java.util.concurrent.atomic.AtomicInteger();
 
+    private void checkCollectionKoikatsu(Uri image){
+        if(image==null||!"content".equals(image.getScheme()))return;
+        final String name=displayName(image);
+        if(name==null||!name.toLowerCase(java.util.Locale.ROOT).endsWith(".png"))return;
+        io.execute(()->{
+            boolean genuine=KoikatsuCards.isCharacterCard(this,image);
+            if(!image.toString().equals(fgSelectedCollectionImage))return;
+            if(genuine){
+                fgVerifiedKoikatsuCard=image;
+                currentUri=image;
+                android.util.Log.i("FG_KOIKATSU","NATIVE_CARD_VERIFIED");
+            }
+            final boolean verified=genuine;
+            runOnUiThread(()->js("window.FileGestionerFolder?.koikatsuCard("+verified+")"));
+        });
+    }
     // Image tiles already have SAF URIs from the library scanner. Reuse those
     // entries for local storage AND Round Sync; never enumerate a cloud folder
     // a second time just to display its already-listed pictures.
@@ -30,6 +46,8 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
         fgImageCollectionCount.set(0);
         fgSelectedCollectionImage=startUri;
         fgImageCollectionActive=true;
+        fgVerifiedKoikatsuCard=null;
+        checkCollectionKoikatsu(Uri.parse(startUri));
         runOnUiThread(()->js("window.loadDocument({\"type\":\"folderImages\","+
             "\"name\":\"Image collection\",\"pages\":[]})"));
     }
@@ -184,7 +202,7 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
                         Uri file=android.provider.DocumentsContract.buildDocumentUriUsingTree(
                             libraryTree,id);
                         batch.add(new FolderPage(file,name));
-                        if(batch.size()>=64){
+                        if(batch.size()>=(started.get()?64:2)){
                             flush.accept(batch);
                             batch=new java.util.ArrayList<>(64);
                         }
