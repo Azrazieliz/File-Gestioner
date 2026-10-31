@@ -93,6 +93,32 @@ style+="""
 """
 style+="""
 
+/* Android 17 draws edge-to-edge; use fixed viewport controls and leave
+   clearance for transient navigation bars, not the auto-sized editor bottom. */
+body.fg-image-reader-active .fg-image-toolbar{
+ position:fixed!important;bottom:max(94px,calc(env(safe-area-inset-bottom,0px) + 74px))!important;
+ left:50%!important;right:auto!important;z-index:2147483000!important;
+ width:min(calc(100vw - 18px),500px)!important;
+ transform:translateX(-50%)!important;
+ pointer-events:auto!important;touch-action:manipulation!important;
+}
+body.fg-image-reader-active .fg-image-toolbar-small{
+ opacity:.3!important;transform:translateX(-50%)!important;
+}
+body.fg-image-reader-active .fg-control-button{
+ min-height:44px!important;min-width:40px!important;
+}
+body.fg-image-reader-active .fg-koikatsu-float{
+ position:fixed!important;right:12px!important;left:auto!important;
+ top:max(32px,calc(env(safe-area-inset-top,0px) + 22px))!important;
+ bottom:auto!important;z-index:2147483001!important;
+ min-height:50px!important;padding:10px 17px!important;
+ background:#5270ee!important;color:white!important;
+ border:1px solid #a4b3ff!important;border-radius:13px!important;
+ box-shadow:0 4px 20px #000a;touch-action:manipulation!important;
+ font:700 15px/1.25 system-ui!important;
+}
+body.fg-image-reader-active .fg-koikatsu-float[hidden]{display:none!important}
 /* Separate image-reading surface: no EPUB dock, no section bars or wasted
    document canvas. Continuous mode is edge-to-edge and naturally sized. */
 body.fg-folder-reading{margin:0!important;overflow:hidden!important;background:#000!important}
