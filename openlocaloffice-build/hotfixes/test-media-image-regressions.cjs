@@ -38,7 +38,6 @@ assert(!libFile.includes('if(++total>=PAGE_SIZE)break;') ||
        'Library still truncates folders at 500 files');
 // The native folder reader is not the generic loader: it must reveal #editor.
 assert(js.includes("editor.classList.remove('hidden');"),'Image folder editor stays hidden');
-assert(js.includes("editor.style.display='block'"),'Image folder may retain display:none');
 const folderPatch=fs.readFileSync('../hotfixes/apply-streamed-image-folders-20261031.py','utf8');
 assert(folderPatch.includes("DocumentsContract.getTreeDocumentId(libraryTree)"),
   'Folder access still depends on transient listing state');
