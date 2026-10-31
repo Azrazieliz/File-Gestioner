@@ -28,7 +28,9 @@ repl=r'''    private final java.util.concurrent.ExecutorService fgDirectoryExecu
                 // Old collection scanner stopped at 500 and built an all-file
                 // JSONArray before showing any files. Every bounded batch is
                 // displayed as soon as its cursor rows are read.
-                ReaderLibrary.Listing listing=ReaderLibrary.stream(this,root,folder,
+                for(int attempt=0;attempt<3;attempt++){
+                  try {
+                    ReaderLibrary.Listing listing=ReaderLibrary.stream(this,root,folder,
                     (directory,batch,finished)->{
                         if(request!=fgDirectoryVersion.get())
                             throw new java.util.concurrent.CancellationException();
@@ -78,6 +80,23 @@ repl=r'''    private final java.util.concurrent.ExecutorService fgDirectoryExecu
                 android.util.Log.i("FG_PERF","COLLECTION_STREAM_DONE_ms="+
                     (android.os.SystemClock.elapsedRealtime()-started)+
                     " folder="+listing.folder);
+                    break;
+                  } catch(ReaderLibrary.PendingDirectoryException pending){
+                    if(request!=fgDirectoryVersion.get())return;
+                    android.util.Log.w("FG_FOLDER","ROUND_SYNC_RETRY attempt="+
+                        (attempt+1)+" loading="+pending.loading+
+                        " message="+pending.getMessage());
+                    if(attempt==2)throw pending;
+                    final int retry=attempt+2;
+                    runOnUiThread(()->{
+                        if(request==fgDirectoryVersion.get())
+                            js("window.FileGestionerLibrary?.loadingStatus("+
+                                q("RoundSync has not returned the folder contents. Retrying "+
+                                    retry+"/3 without discarding images…")+")");
+                    });
+                    Thread.sleep(3000L);
+                  }
+                }
             }catch(java.util.concurrent.CancellationException ignored){
                 android.util.Log.i("FG_PERF","COLLECTION_STREAM_CANCELLED");
             }catch(Throwable error){
