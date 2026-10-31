@@ -37,7 +37,7 @@ s=s.replace(anchor,'''    private volatile Uri fgConvertSource;
              document&&"png".equals(format)||
              table&&("csv".equals(format)||"tsv".equals(format))))return;
         fgConvertSource=source;fgConvertFormat=format;
-        String clean=name.replaceFirst("\\.[^.]+$","");
+        String clean=name.replaceFirst("[.][^.]+$","");
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.setType(fgConvertMime(format));
         intent.addCategory(Intent.CATEGORY_OPENABLE);
