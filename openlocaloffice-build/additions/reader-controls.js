@@ -168,7 +168,6 @@ function renderImageFolder(data){
  work?.removeAttribute('hidden');
  editor.classList.remove('hidden');
  editor.removeAttribute('hidden');
- editor.style.display='block';
  document.body.classList.add('fg-folder-reading');
  const host=el('div','fg-folder-reader');
  const view=el('div','fg-folder-scroll');
