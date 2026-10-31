@@ -37,12 +37,12 @@ def is_koikatsu_card(payload):
             return b"KoiKatuChara" in trailer or b"KoikatsuChara" in trailer
     return False
 
-def studio_ws(data):
+def studio_ws(data,timeout=12):
     # KKStudioSocket runs INSIDE native Koikatsu Studio and talks only to this
     # local process. Never forward the unsecured game WebSocket to the phone.
     sys.path.insert(0,str(ROOT/"vendor"))
     import websocket
-    conn=websocket.create_connection("ws://127.0.0.1:8765/ws",timeout=12)
+    conn=websocket.create_connection("ws://127.0.0.1:8765/ws",timeout=timeout)
     try:
         conn.send(json.dumps(data))
         result=json.loads(conn.recv())
@@ -78,6 +78,23 @@ def ensure_studio_ready(timeout=38):
             return False
         time.sleep(1.5)
     return False
+
+def complete_studio_session(sid,source):
+    """Load a real character on a worker; Android can show progress immediately."""
+    try:
+        if not ensure_studio_ready():
+            raise RuntimeError("Native Koikatsu Studio is unavailable")
+        response=studio_ws({"type":"add","command":"character",
+            "sex":"female","path":str(source)},timeout=90)
+        if response.get("type")!="success":
+            raise RuntimeError("Native Koikatsu rejected card: "+str(response)[:220])
+        with GUARD:
+            if sid in SESSIONS:SESSIONS[sid]["ready"]=True
+        print("FG_KOIKATSU_IMPORT_READY",sid,flush=True)
+    except Exception as error:
+        with GUARD:
+            if sid in SESSIONS:SESSIONS[sid]["error"]=str(error)[:300]
+        print("FG_KOIKATSU_IMPORT_FAILED",str(error)[:200],flush=True)
 
 class Handler(BaseHTTPRequestHandler):
     server_version="FGNative3D/0.1"
@@ -130,17 +147,22 @@ class Handler(BaseHTTPRequestHandler):
             source=sub/(digest+(".png" if kind=="koikatsu" else ".blend"))
             if not source.exists():source.write_bytes(payload)
         with GUARD:
-            SESSIONS[sid]={"kind":kind,"source":str(source or ""),"created":time.time()}
+            SESSIONS[sid]={"kind":kind,"source":str(source or ""),
+                "created":time.time(),"ready":kind!="koikatsu","error":None}
         if kind=="koikatsu":
-            if not ensure_studio_ready():
-                return self.reply(202,{"session":sid,"kind":kind,"ready":False,
-                    "error":"Native Koikatsu Studio did not connect. Verify its plugins and retry."})
-            response=studio_ws({"type":"add","command":"character","sex":"female","path":str(source)})
-            if response.get("type")!="success":raise RuntimeError(str(response))
+            threading.Thread(target=complete_studio_session,
+                args=(sid,source),daemon=True).start()
+            return self.reply(202,{"session":sid,"kind":kind,"ready":False})
         return self.reply(200,{"session":sid,"kind":kind,"ready":True})
     def get_request(self):
         parsed=urlparse(self.path);route=parsed.path
         if route=="/api/status":
+            q=parse_qs(parsed.query);sid=q.get("session",[""])[0]
+            if sid:
+                with GUARD:info=SESSIONS.get(sid)
+                if not info:return self.reply(404,{"error":"Unknown 3D session"})
+                return self.reply(200,{"session":sid,"ready":info.get("ready",False),
+                    "error":info.get("error")})
             return self.reply(200,{"online":True,"blender":BLENDER.is_file(),
                 "koikatsuStudio":STUDIO.is_file(),"studioConnected":studio_ready(),
                 "transport":"usb-local"})
@@ -155,6 +177,8 @@ class Handler(BaseHTTPRequestHandler):
         if not all(map(math.isfinite,(yaw,pitch,distance))):
             return self.reply(400,{"error":"Invalid camera values"})
         if info["kind"]=="koikatsu":
+            if not info.get("ready"):
+                return self.reply(425,{"error":info.get("error") or "Koikatsu character is loading"})
             if not studio_ready():return self.reply(503,{"error":"CharaStudio native plugin disconnected"})
             # Camera controls and screenshot are handled inside Unity, no GLB.
             studio_ws({"type":"camera","command":"setview",
