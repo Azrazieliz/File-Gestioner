@@ -163,27 +163,44 @@ public final class FgTeraboxClient {
     }
     public InputStream open(String path) throws Exception{
         String link=fileDetails(path).optString("dlink","");
-        if(!link.startsWith("https://")&&!link.startsWith("http://"))
-            throw new IOException("TeraBox has not supplied a download URL");
-        HttpURLConnection stream=(HttpURLConnection)new URL(link).openConnection();
-        stream.setConnectTimeout(12000);stream.setReadTimeout(50000);
-        stream.setRequestProperty("User-Agent","Mozilla/5.0 (Linux; Android) AppleWebKit/537.36");
-        stream.setRequestProperty("Referer","https://www.terabox.com/");
-        String host=stream.getURL().getHost().toLowerCase(Locale.ROOT);
-        if(host.equals("terabox.com")||host.endsWith(".terabox.com")||
-           host.equals("dubox.com")||host.endsWith(".dubox.com")){
-            stream.setRequestProperty("Cookie",cookie());
-        }
-        try{
-            int code=stream.getResponseCode();
-            if(code<200||code>=300)throw new IOException("Cloud download HTTP "+code);
-            InputStream raw=stream.getInputStream();
-            return new FilterInputStream(raw){
-                @Override public void close() throws IOException{
-                    try{super.close();}finally{stream.disconnect();}
+        if(!link.startsWith("https://"))
+            throw new IOException("TeraBox did not provide a secure download URL");
+        URL url=new URL(link);
+        for(int redirect=0;redirect<7;redirect++){
+            if(!"https".equalsIgnoreCase(url.getProtocol()))
+                throw new IOException("Insecure cloud file redirect blocked");
+            HttpURLConnection stream=(HttpURLConnection)url.openConnection();
+            stream.setInstanceFollowRedirects(false);
+            stream.setConnectTimeout(12000);stream.setReadTimeout(50000);
+            stream.setRequestProperty("User-Agent","Mozilla/5.0 (Linux; Android) AppleWebKit/537.36");
+            stream.setRequestProperty("Referer","https://www.terabox.com/");
+            String host=url.getHost().toLowerCase(Locale.ROOT);
+            // NDUS is sent only to the official TeraBox/Dubox domains.
+            // Manual redirects prevent leaking it to arbitrary file CDNs.
+            if(host.equals("terabox.com")||host.endsWith(".terabox.com")||
+               host.equals("dubox.com")||host.endsWith(".dubox.com")){
+                stream.setRequestProperty("Cookie",cookie());
+            }
+            try{
+                int code=stream.getResponseCode();
+                if(code>=300&&code<400){
+                    String location=stream.getHeaderField("Location");
+                    stream.disconnect();
+                    if(location==null||location.isEmpty())
+                        throw new IOException("Cloud file redirect has no destination");
+                    url=new URL(url,location);continue;
                 }
-            };
-        }catch(Exception e){stream.disconnect();throw e;}
+                if(code<200||code>=300)throw new IOException("Cloud download HTTP "+code);
+                InputStream raw=stream.getInputStream();
+                final HttpURLConnection connected=stream;
+                return new FilterInputStream(raw){
+                    @Override public void close() throws IOException{
+                        try{super.close();}finally{connected.disconnect();}
+                    }
+                };
+            }catch(Exception e){stream.disconnect();throw e;}
+        }
+        throw new IOException("Too many cloud download redirects");
     }
     public void save(String path,OutputStream output) throws Exception{
         try(InputStream input=open(path)){
