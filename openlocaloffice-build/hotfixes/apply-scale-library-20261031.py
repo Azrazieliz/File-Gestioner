@@ -21,6 +21,8 @@ repl=r'''    private final java.util.concurrent.ExecutorService fgDirectoryExecu
             final long started=android.os.SystemClock.elapsedRealtime();
             try {
                 if(request!=fgDirectoryVersion.get())return;
+                final java.util.concurrent.atomic.AtomicBoolean firstBatchLogged=
+                    new java.util.concurrent.atomic.AtomicBoolean();
                 allowedLibraryUris.clear();
                 libraryCovers.clear();
                 // Old collection scanner stopped at 500 and built an all-file
@@ -30,6 +32,11 @@ repl=r'''    private final java.util.concurrent.ExecutorService fgDirectoryExecu
                     (directory,batch,finished)->{
                         if(request!=fgDirectoryVersion.get())
                             throw new java.util.concurrent.CancellationException();
+                        if(batch.length()>0 && firstBatchLogged.compareAndSet(false,true))
+                            android.util.Log.i("FG_PERF","COLLECTION_FIRST_BATCH_ms="+
+                                (android.os.SystemClock.elapsedRealtime()-started)+
+                                " provider="+root.getAuthority()+
+                                " rows="+batch.length());
                         for(int i=0;i<batch.length();i++){
                             org.json.JSONObject item=batch.getJSONObject(i);
                             String id=java.util.UUID.randomUUID().toString()
