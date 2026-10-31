@@ -47,6 +47,20 @@ async function render(){
   }
 }
 function requestFrame(){if(!active||dead)return;if(busy)scheduled=true;else render();}
+async function awaitNativeReady(sid){
+  const started=Date.now();
+  while(!dead&&active===sid&&Date.now()-started<110000){
+    try{
+      const result=await (await api('/api/status?session='+encodeURIComponent(sid))).json();
+      if(dead||active!==sid)return;
+      if(result.error){setStatus(result.error);return;}
+      if(result.ready){setStatus('Native character loaded · rendering…');requestFrame();return;}
+      setStatus('Loading genuine Koikatsu character in PC Studio…');
+    }catch(error){if(!dead)setStatus(String(error.message||error));return;}
+    await new Promise(resolve=>setTimeout(resolve,1700));
+  }
+  if(!dead&&active===sid)setStatus('Koikatsu load did not finish. Reconnect to retry.');
+}
 function onOpen(response){
   try{
     const data=typeof response==='string'?JSON.parse(response):response;
@@ -55,6 +69,7 @@ function onOpen(response){
     setStatus(data.ready?'Connected · preparing native 3D…':
       (data.error||'Native renderer is not yet online'));
     if(data.ready)requestFrame();
+    else if(active)awaitNativeReady(active);
   }catch(e){setStatus('Invalid native PC response: '+e.message);}
 }
 function close(){
