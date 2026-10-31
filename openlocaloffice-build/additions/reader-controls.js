@@ -190,10 +190,20 @@ function renderImageFolder(data){
  const modeButton=btn('Pages','Switch to page-by-page images',()=>switchMode());
  const position=el('span','fg-image-position','0 / …');
  const collapse=btn('⌄','Toggle image controls',()=>bar.classList.toggle('fg-image-toolbar-small'));
- const koikatsu=btn('Open 3D','Open verified Koikatsu card with remote PC',
-   ()=>window.FileGestionerRemoteViewer?.open('koikatsu'));
+ const koikatsu=btn('Check 3D','Verify whether this PNG contains a real Koikatsu character',
+   ()=>{
+     if(koikatsu.dataset.verified==='true')
+       window.FileGestionerRemoteViewer?.open('koikatsu');
+     else{
+       koikatsu.textContent='Checking card…';
+       window.AndroidBridge?.verifyCurrentKoikatsuCard?.();
+     }
+   });
  koikatsu.classList.add('fg-image-koikatsu fg-koikatsu-float');
- koikatsu.hidden=!Boolean(data.koikatsuCard);
+ const cardCandidate=pages.some(p=>/\.png$/i.test(p?.name||''));
+ koikatsu.hidden=!cardCandidate;
+ koikatsu.dataset.verified=data.koikatsuCard===true?'true':'false';
+ if(data.koikatsuCard===true)koikatsu.textContent='Open 3D';
  bar.append(close,previous,position,next,modeButton,collapse);
  host.append(view,bar,koikatsu);editor.replaceChildren(host);
  for(const id of ['sheetBar','spreadsheetTools','textFormat','notice'])
@@ -390,8 +400,11 @@ function renderImageFolder(data){
    count:()=>pages.length,
    select:i=>{selectedIndex=i;jumpTo(i);},
    koikatsuCard:valid=>{
-     koikatsu.hidden=!valid;
-     if(valid)koikatsu.title='Open verified Koikatsu character remotely in 3D';
+     koikatsu.dataset.verified=valid?'true':'false';
+     koikatsu.hidden=!cardCandidate&&!valid;
+     koikatsu.textContent=valid?'Open 3D':'Check 3D';
+     koikatsu.title=valid?'Open verified Koikatsu character remotely in 3D':
+       'No verified 3D payload yet; tap to retry identification';
    }
  };
  view.classList.toggle('fg-image-paged',imageMode==='pages');
