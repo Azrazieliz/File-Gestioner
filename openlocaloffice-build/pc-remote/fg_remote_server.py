@@ -10,6 +10,9 @@ ROOT=pathlib.Path.home()/".file-gestioner"/"native-3d"
 ROOT.mkdir(parents=True,exist_ok=True)
 BLENDER=pathlib.Path(r"D:\Tools\Blender-5.2.2-LTS\blender-5.2.2-windows-x64\blender.exe")
 STUDIO=pathlib.Path(r"D:\Tools\Steam\steamapps\common\Koikatsu Party\CharaStudio.exe")
+STUDIO_HELPER=pathlib.Path(__file__).with_name("fg_studio_background_window.py")
+STUDIO_LAUNCH_LOCK=threading.Lock()
+STUDIO_RUNNER=None
 RENDER=pathlib.Path(__file__).with_name("fg_blender_frame.py")
 KEYFILE=ROOT/"pair-token.txt"
 if not KEYFILE.exists():
@@ -50,6 +53,31 @@ def studio_ws(data):
 def studio_ready():
     try:return studio_ws({"type":"ping","message":"File Gestioner"}).get("type")=="pong"
     except Exception:return False
+
+def ensure_studio_ready(timeout=38):
+    """Launch the installed native Studio only when a character is requested.
+    Offscreen renderer remains independent from the foreground desktop."""
+    global STUDIO_RUNNER
+    if studio_ready():return True
+    if not STUDIO.is_file() or not STUDIO_HELPER.is_file():
+        return False
+    with STUDIO_LAUNCH_LOCK:
+        if studio_ready():return True
+        if STUDIO_RUNNER is None or STUDIO_RUNNER.poll() is not None:
+            flags=getattr(subprocess,"CREATE_NO_WINDOW",0)
+            STUDIO_RUNNER=subprocess.Popen(
+                [sys.executable,str(STUDIO_HELPER)],
+                cwd=str(STUDIO.parent),creationflags=flags,
+                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            print("FG_STUDIO_AUTOSTART requested",flush=True)
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        if studio_ready():return True
+        if STUDIO_RUNNER is not None and STUDIO_RUNNER.poll() is not None:
+            print("FG_STUDIO_AUTOSTART helper stopped",flush=True)
+            return False
+        time.sleep(1.5)
+    return False
 
 class Handler(BaseHTTPRequestHandler):
     server_version="FGNative3D/0.1"
@@ -104,9 +132,9 @@ class Handler(BaseHTTPRequestHandler):
         with GUARD:
             SESSIONS[sid]={"kind":kind,"source":str(source or ""),"created":time.time()}
         if kind=="koikatsu":
-            if not studio_ready():
+            if not ensure_studio_ready():
                 return self.reply(202,{"session":sid,"kind":kind,"ready":False,
-                    "error":"Native CharaStudio bridge is not online; start native Studio plugin in the background"})
+                    "error":"Native Koikatsu Studio did not connect. Verify its plugins and retry."})
             response=studio_ws({"type":"add","command":"character","sex":"female","path":str(source)})
             if response.get("type")!="success":raise RuntimeError(str(response))
         return self.reply(200,{"session":sid,"kind":kind,"ready":True})
