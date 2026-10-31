@@ -161,6 +161,14 @@ function renderImageFolder(data){
    window.FileGestionerLibrary?.show?.();
    return;
  }
+ // The normal loadDocument() initialization is intentionally skipped for
+ // folder images; explicitly reveal the same editor surface it would show.
+ const work=by('#work');
+ work?.classList.remove('hidden');
+ work?.removeAttribute('hidden');
+ editor.classList.remove('hidden');
+ editor.removeAttribute('hidden');
+ editor.style.display='block';
  document.body.classList.add('fg-folder-reading');
  const host=el('div','fg-folder-reader');
  const view=el('div','fg-folder-scroll');
