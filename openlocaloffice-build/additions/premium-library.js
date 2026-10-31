@@ -160,6 +160,127 @@ function loadRemoteCover(image,url,cover){
  coverJobs.push({image,url,cover});
  pumpCovers();
 }
+
+function closeFileActions(){operationDialog?.remove();operationDialog=null;}
+function fileSheet(title,note){
+ closeFileActions();
+ const overlay=E('div','fg-file-sheet-overlay');
+ const sheet=E('section','fg-file-sheet');
+ sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','true');
+ sheet.setAttribute('aria-label',title);
+ overlay.addEventListener('click',e=>{if(e.target===overlay)closeFileActions();});
+ const head=E('header','fg-file-sheet-head');
+ head.append(E('strong','',title),b('×','fg-file-sheet-close',closeFileActions));
+ sheet.append(head);
+ if(note)sheet.append(E('p','fg-file-sheet-subtitle',note));
+ overlay.append(sheet);document.body.append(overlay);operationDialog=overlay;
+ return sheet;
+}
+function fileAction(sheet,label,description,callback,{danger=false,disabled=false}={}){
+ const control=b(label,'fg-file-action'+(danger?' fg-file-danger':''),callback);
+ control.disabled=disabled;
+ if(description)control.append(E('small','fg-file-action-description',description));
+ sheet.append(control);return control;
+}
+function showSortMenu(){
+ const sheet=fileSheet('Sort files','Choose how to order this collection');
+ const labels={name:'Name',modified:'Last modified',size:'Size',type:'File type'};
+ for(const [key,label] of Object.entries(labels))
+   fileAction(sheet,(sortBy===key?'✓ ':'')+label,'',()=>{
+     if(sortBy===key)sortDescending=!sortDescending;
+     else{sortBy=key;sortDescending=(key==='modified'||key==='size');}
+     sortButton.textContent=labels[sortBy]+(sortDescending?' ↓':' ↑');
+     pageStart=0;closeFileActions();render();
+   });
+}
+function fileProperties(item){
+ const sheet=fileSheet(item.name,'Properties of the original file');
+ const dl=E('dl','fg-file-details');
+ const data=[
+  ['Type',item.folder?'Folder':label(item)],
+  ['Size',item.folder?'—':formatSize(item.size)||'Unknown'],
+  ['Modified',item.modified?new Date(item.modified).toLocaleString():'Unknown'],
+  ['Provider',/de\.felixnuesse\.extract\.vcp/.test(item.uri||'')?'Round Sync':'Storage provider'],
+  ['MIME',item.mime||'Not reported']
+ ];
+ for(const [key,value] of data)dl.append(E('dt','',key),E('dd','',value));
+ sheet.append(dl);
+ fileAction(sheet,'Close','',closeFileActions);
+}
+function showFileActions(item){
+ const kind=classify(item);
+ const write=Boolean(bridge()?.canManageLibraryFiles?.());
+ const sheet=fileSheet(item.name,(item.folder?'Folder':label(item))+
+   (formatSize(item.size)?' · '+formatSize(item.size):''));
+ const openLabel=item.folder?'Browse folder':
+    kind==='image'?'Read image collection':kind==='comic'?'Read comic archive':
+    kind==='archive'?'Open archive':kind==='pdf'?'Read PDF':
+    kind==='video'?'Play video fullscreen':kind==='audio'?'Play audio':
+    kind==='book'?'Read ebook':kind==='model'?'Open 3D asset':
+    kind==='file'?'Open with Android':
+    /\.(csv|xlsx|xls)$/i.test(item.name)?'Open spreadsheet':'Open document';
+ fileAction(sheet,openLabel,'Use the matching file viewer',()=>{
+   closeFileActions();openBook(item);
+ });
+ if(item.folder)
+   fileAction(sheet,'Read folder images','Progressively read images without leaving this folder',()=>{
+     closeFileActions();
+     visible=false;root.classList.add('fg-lib-hidden');
+     document.getElementById('home')?.classList.add('hidden');
+     document.getElementById('work')?.classList.remove('hidden');
+     bridge()?.openImageFolder?.(item.uri);
+   });
+ if(kind==='image')
+   fileAction(sheet,'View only this image','Keep this image separate from its folder',()=>{
+     closeFileActions();activeUri=item.uri;
+     visible=false;root.classList.add('fg-lib-hidden');
+     document.getElementById('home')?.classList.add('hidden');
+     document.getElementById('work')?.classList.remove('hidden');
+     bridge()?.openLibraryFile?.(item.uri);
+   });
+ if(!item.folder){
+   fileAction(sheet,'Open with another app','Choose an installed Android application',()=>{
+     closeFileActions();bridge()?.openLibraryExternally?.(item.uri);
+   });
+   fileAction(sheet,'Share original file','Share through the Android share sheet',()=>{
+     closeFileActions();bridge()?.shareLibraryFile?.(item.uri);
+   });
+ }
+ fileAction(sheet,'Properties','Size, type, date and storage provider',()=>fileProperties(item));
+ if(!item.folder){
+   fileAction(sheet,'Rename','Rename in the original storage provider',()=>{
+     const edit=fileSheet('Rename file','Retain the extension unless changing the format');
+     const field=E('input','fg-file-name-input');field.value=item.name;
+     field.maxLength=240;field.setAttribute('aria-label','New file name');
+     edit.append(field);
+     fileAction(edit,'Save name','',()=>{
+       const name=field.value.trim();
+       if(!name||name===item.name||/[/\\]/.test(name))return;
+       bridge()?.renameLibraryFile?.(item.uri,name);closeFileActions();
+     });
+     field.focus();
+   },{disabled:!write});
+   fileAction(sheet,'Delete file','This permanently removes the original file',()=>{
+     const confirm=fileSheet('Delete original file?','This cannot be undone.');
+     confirm.append(E('p','fg-file-delete-name',item.name));
+     fileAction(confirm,'Cancel','',closeFileActions);
+     fileAction(confirm,'Delete permanently','Confirm deletion of the original file',()=>{
+       bridge()?.deleteLibraryFile?.(item.uri);closeFileActions();
+     },{danger:true});
+   },{danger:true,disabled:!write});
+   if(!write)sheet.append(E('p','fg-file-write-note',
+     'Rename and delete require write permission from this storage provider. Re-select the collection to request write access.'));
+ }
+}
+function operationResult(result){
+ if(!result)return;
+ const toast=E('div','fg-file-toast',
+   (result.ok?'':'Action failed: ')+(result.detail||result.operation));
+ toast.setAttribute('role','status');document.body.append(toast);
+ setTimeout(()=>toast.remove(),4500);
+ if(result.ok&&(result.operation==='rename'||result.operation==='delete'))request();
+}
+
 function card(item,i){
  const c=classify(item),tile=E('article','fg-lib-tile fg-lib-'+c);
  tile.setAttribute('role','button');tile.setAttribute('tabindex','0');
