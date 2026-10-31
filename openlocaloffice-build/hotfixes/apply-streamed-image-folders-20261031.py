@@ -12,8 +12,23 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
     private final java.util.concurrent.atomic.AtomicLong fgFolderVersion=
         new java.util.concurrent.atomic.AtomicLong();
     private void openFolderImages(String uriText){
-        if(uriText==null||!allowedLibraryUris.contains(uriText))return;
+        if(uriText==null||libraryTree==null)return;
         final Uri directory=Uri.parse(uriText);
+        // Opening a subfolder must not depend on the current scan's transient
+        // allowedLibraryUris set: it is cleared when the library refreshes.
+        // Validate against the persistently granted SAF tree instead.
+        try{
+            if(!"content".equals(directory.getScheme())||
+               !libraryTree.getAuthority().equals(directory.getAuthority())||
+               !android.provider.DocumentsContract.getTreeDocumentId(libraryTree)
+                   .equals(android.provider.DocumentsContract.getTreeDocumentId(directory))||
+               !android.provider.DocumentsContract.isDocumentUri(this,directory))
+                throw new SecurityException("Folder is outside the selected library");
+        }catch(Exception invalid){
+            runOnUiThread(()->js("window.FileGestionerLibrary?.error("+
+                q("Cannot open image folder: "+message(invalid))+")"));
+            return;
+        }
         final long request=fgFolderVersion.incrementAndGet();
         final String token=java.util.UUID.randomUUID().toString();
         fgFolderToken=token;
