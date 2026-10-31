@@ -14,6 +14,61 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
     private void openFolderImages(String uriText){
         openFolderImages(uriText,null);
     }
+    private volatile String fgSelectedCollectionImage;
+    private volatile boolean fgImageCollectionActive;
+    private final java.util.concurrent.atomic.AtomicInteger fgImageCollectionCount=
+        new java.util.concurrent.atomic.AtomicInteger();
+
+    // Image tiles already have SAF URIs from the library scanner. Reuse those
+    // entries for local storage AND Round Sync; never enumerate a cloud folder
+    // a second time just to display its already-listed pictures.
+    private void beginImageCollection(String startUri){
+        if(startUri==null||!allowedLibraryUris.contains(startUri))return;
+        fgFolderVersion.incrementAndGet();
+        fgFolderToken=java.util.UUID.randomUUID().toString();
+        fgFolderPageMap.clear();
+        fgImageCollectionCount.set(0);
+        fgSelectedCollectionImage=startUri;
+        fgImageCollectionActive=true;
+        runOnUiThread(()->js("window.loadDocument({\"type\":\"folderImages\","+
+            "\"name\":\"Image collection\",\"pages\":[]})"));
+    }
+    private void appendImageCollectionChunk(String json){
+        if(!fgImageCollectionActive||json==null||json.length()>60000)return;
+        try{
+            org.json.JSONArray files=new org.json.JSONArray(json);
+            if(files.length()>96)return;
+            org.json.JSONArray pages=new org.json.JSONArray();
+            for(int i=0;i<files.length();i++){
+                org.json.JSONObject file=files.getJSONObject(i);
+                String value=file.optString("uri"),name=file.optString("name");
+                if(value.isEmpty()||name.isEmpty()||!allowedLibraryUris.contains(value))
+                    continue;
+                Uri uri=Uri.parse(value);
+                if(libraryTree==null||!libraryTree.getAuthority().equals(uri.getAuthority()))
+                    continue;
+                int id=fgImageCollectionCount.getAndIncrement();
+                fgFolderPageMap.put(id,new FolderPage(uri,name));
+                pages.put(new org.json.JSONObject()
+                    .put("name",name)
+                    .put("url","https://fg-assets.invalid/folder-img/"+fgFolderToken+"/"+id)
+                    .put("selected",value.equals(fgSelectedCollectionImage)));
+            }
+            if(pages.length()>0){
+                String payload=new org.json.JSONObject().put("pages",pages).toString();
+                runOnUiThread(()->js("window.FileGestionerFolder?.append("+payload+")"));
+            }
+        }catch(Exception e){
+            android.util.Log.w("FG_FOLDER","IMAGE_COLLECTION_CHUNK_ERROR",e);
+        }
+    }
+    private void finishImageCollection(){
+        if(!fgImageCollectionActive)return;
+        fgImageCollectionActive=false;
+        final int count=fgImageCollectionCount.get();
+        runOnUiThread(()->js("window.FileGestionerFolder?.done("+count+")"));
+        android.util.Log.i("FG_FOLDER","IMAGE_COLLECTION_READY count="+count);
+    }
     private void openImageInFolder(String folderId,String selectedUri){
         if(libraryTree==null||selectedUri==null)return;
         // File URI must have been exposed by our selected collection.
@@ -211,7 +266,16 @@ s=s[:start]+new+s[end:]
 # The pre-existing bridge method is inserted by apply-reading-platform.
 anchor='''        @JavascriptInterface public void openKoikatsu3d(){'''
 assert s.count(anchor)==1, "3D bridge insertion point missing"
-s=s.replace(anchor,'''        @JavascriptInterface public void openImageInFolder(String folder,String selected){
+s=s.replace(anchor,'''        @JavascriptInterface public void beginImageCollection(String image){
+            MainActivity.this.beginImageCollection(image);
+        }
+        @JavascriptInterface public void appendImageCollectionChunk(String json){
+            MainActivity.this.appendImageCollectionChunk(json);
+        }
+        @JavascriptInterface public void finishImageCollection(){
+            MainActivity.this.finishImageCollection();
+        }
+        @JavascriptInterface public void openImageInFolder(String folder,String selected){
             MainActivity.this.openImageInFolder(folder,selected);
         }
 '''+anchor,1)
