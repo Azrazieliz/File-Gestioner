@@ -252,6 +252,26 @@ function showFileActions(item){
      showTransferSheet('Moving file');
    },{disabled:!write});
  }
+ if(!item.folder){
+   const lower=item.name.toLowerCase();
+   const image=/\\.(png|jpe?g|bmp|webp)$/.test(lower);
+   const firstPdf=/\\.pdf$/.test(lower);
+   const separated=/\\.(csv|tsv)$/.test(lower);
+   if(image||firstPdf||separated)
+     fileAction(sheet,'Convert format','Save as a new file; the original is unchanged',()=>{
+       const choose=fileSheet('Convert '+item.name,'Select a supported output. Your original is preserved.');
+       const variants=image?[
+         ['PNG','png'],['JPEG · 92% quality','jpeg'],['WebP · 92% quality','webp'],
+         ['PDF · single image page','pdf']
+       ]:firstPdf?[['PNG · first PDF page only','png']]:
+         lower.endsWith('.csv')?[['TSV · tab-separated','tsv']]:
+         [['CSV · comma-separated','csv']];
+       for(const [label,format] of variants)
+         fileAction(choose,label,'Android will ask where to save the converted file',()=>{
+           closeFileActions();bridge()?.convertLibraryFile?.(item.uri,format);
+         });
+     });
+ }
  fileAction(sheet,'Properties','Size, type, date and storage provider',()=>fileProperties(item));
  if(!item.folder){
    fileAction(sheet,'Rename','Rename in the original storage provider',()=>{
