@@ -140,6 +140,10 @@ css.write_text(css.read_text()+r'''
 .fg-pc-viewport{position:relative;flex:1;min-height:120px;background:#101925;
  display:grid;place-items:center;touch-action:none;overflow:hidden}
 .fg-pc-frame{width:100%;height:100%;object-fit:contain;pointer-events:none}
+.fg-pc-frame[hidden]{display:none!important}
+.fg-pc-placeholder{max-width:300px;text-align:center;color:#a3b5cf;
+ font:500 13px/1.65 system-ui;padding:18px}
+.fg-pc-placeholder[hidden]{display:none!important}
 .fg-pc-status{font:12px/1.5 system-ui;color:#cbd7f2;min-height:30px;padding:6px}
 ''')
 xml=root/"res/xml"
