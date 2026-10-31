@@ -311,6 +311,14 @@ jobs:
         working-directory: openlocaloffice-build/project
         run: gradle --no-daemon --max-workers=2 assembleRelease --stacktrace
 
+      - name: Stage unsigned release for signing on authorized PC
+        uses: actions/upload-artifact@v4
+        with:
+          name: File-Gestioner-unsigned-release-apk
+          path: openlocaloffice-build/project/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Validate existing release signing credentials
         shell: bash
         env:
