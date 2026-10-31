@@ -33,7 +33,7 @@ assert(lower!==-1&&sniff!==-1&&lower<sniff,
   'MP4 must be opened without slow image/content sniffing');
 const libFile=fs.readFileSync('app/src/main/java/com/openlocal/office/core/ReaderLibrary.java','utf8');
 assert(libFile.includes('public static Listing stream('),'Incremental folder enumeration missing');
-assert(libFile.includes('if(batch.length()>=96)'),'Directory chunking missing');
+assert(libFile.includes('if(batch.length()>=(firstBatch?12:96))'),'Fast initial metadata batch and bounded directory chunking missing');
 assert(!libFile.includes('if(++total>=PAGE_SIZE)break;') ||
        main.includes('ReaderLibrary.stream(this,root,folder'),
        'Library still truncates folders at 500 files');
