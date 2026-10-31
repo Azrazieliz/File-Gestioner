@@ -34,7 +34,7 @@ assert(lower!==-1&&sniff!==-1&&lower<sniff,
   'MP4 must be opened without slow image/content sniffing');
 const libFile=fs.readFileSync('app/src/main/java/com/openlocal/office/core/ReaderLibrary.java','utf8');
 assert(libFile.includes('public static Listing stream('),'Incremental folder enumeration missing');
-assert(libFile.includes('if(batch.length()>=(firstBatch?12:96))'),'Fast initial metadata batch and bounded directory chunking missing');
+assert(libFile.includes('if(batch.length()>=(firstBatch?1:48))') && libFile.includes('for(int attempt=0;attempt<4&&cursor==null;attempt++)'),'Cloud SAF must show the first available file and retry reduced-column provider queries');
 assert(!libFile.includes('if(++total>=PAGE_SIZE)break;') ||
        main.includes('ReaderLibrary.stream(this,root,folder'),
        'Library still truncates folders at 500 files');
@@ -128,4 +128,8 @@ assert(main.includes('setRemoteEndpoint(String value)')&&
 assert(lib.includes('function hideForReader(){') &&
   lib.includes("if(document.body.classList.contains('fg-folder-reading'))hideForReader();"),
   'External images are still hidden behind welcome library overlay');
+assert(js.includes("setImageViewing?.(true)") && js.includes("fg-koikatsu-float"),'Image reader must hide Android navigation and expose reachable Koikatsu action');
+assert(style.includes("position:fixed!important;bottom:max(94px"),'Image controls remain behind Android system navigation');
+assert(main.includes("setImageImmersiveInternal") && main.includes("WindowInsets.Type.navigationBars()"),'Native immersive reader is missing');
+assert(libFile.includes("Storage provider omitted file ID or name"),'SAF error reporting is incomplete');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
