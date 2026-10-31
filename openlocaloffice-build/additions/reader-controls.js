@@ -185,7 +185,11 @@ function renderImageFolder(data){
  const modeButton=btn('Pages','Switch to page-by-page images',()=>switchMode());
  const position=el('span','fg-image-position','0 / …');
  const collapse=btn('⌄','Toggle image controls',()=>bar.classList.toggle('fg-image-toolbar-small'));
- bar.append(close,previous,position,next,modeButton,collapse);
+ const koikatsu=btn('3D','Open genuine Koikatsu card with the connected PC',
+   ()=>window.FileGestionerRemoteViewer?.open('koikatsu'));
+ koikatsu.classList.add('fg-image-koikatsu');
+ koikatsu.hidden=true;
+ bar.append(close,previous,position,next,modeButton,koikatsu,collapse);
  host.append(view,bar);editor.replaceChildren(host);
  for(const id of ['sheetBar','spreadsheetTools','textFormat','notice'])
    by('#'+id)?.classList.add('hidden');
@@ -226,9 +230,12 @@ function renderImageFolder(data){
      const image=el('img','fg-folder-image');
      image.alt=page.name||'Image '+(i+1);
      image.loading='lazy';image.decoding='async';image.dataset.src=page.url;
-     image.addEventListener('load',()=>updateRotation(image));
+     image.addEventListener('load',()=>{
+       updateRotation(image);
+       image.style.height='';image.style.visibility='';
+     });
      image.addEventListener('error',()=>{
-       if(!section.isConnected)return;
+       if(!section.isConnected||image.dataset.recycled==='yes')return;
        let retry=section.querySelector('.fg-image-retry');
        if(retry)return;
        retry=btn('Retry image','Reload this image from storage',()=>{
@@ -242,6 +249,8 @@ function renderImageFolder(data){
      section.append(image);frag.append(section);
      if(imageObserver)imageObserver.observe(image);
      else image.src=page.url;
+     // First images are readable while the remaining folder is scanned.
+     if(i<3)image.src=page.url;
    }
    stack.insertBefore(frag,sentinel);
    busy=false;
@@ -303,13 +312,26 @@ function renderImageFolder(data){
    frame=requestAnimationFrame(()=>{frame=0;updateCurrent();});
  },{passive:true});
  if(window.IntersectionObserver){
+   // Keep only pages near the viewport decoded, even in 10k-image folders.
+   // Recycled pages retain their measured height so scrolling never jumps.
    imageObserver=new IntersectionObserver(records=>{
      for(const record of records){
-       if(!record.isIntersecting)continue;
-       const img=record.target;imageObserver.unobserve(img);
-       if(img.dataset.src)img.src=img.dataset.src;
+       const img=record.target;
+       if(!img.dataset.src)continue;
+       if(record.isIntersecting){
+         if(img.dataset.recycled==='yes'){
+           img.dataset.recycled='no';
+           img.src=img.dataset.src;
+         }else if(!img.getAttribute('src'))img.src=img.dataset.src;
+       }else if(img.getAttribute('src') && img.complete && img.naturalWidth>0){
+         const h=Math.max(1,Math.ceil(img.getBoundingClientRect().height));
+         img.dataset.recycled='yes';
+         img.style.height=h+'px';
+         img.style.visibility='hidden';
+         img.removeAttribute('src');
+       }
      }
-   },{root:view,rootMargin:'110% 0px',threshold:0});
+   },{root:view,rootMargin:'320% 0px',threshold:0});
    batchObserver=new IntersectionObserver(records=>{
      for(const record of records)if(record.isIntersecting)appendBatch();
    },{root:view,rootMargin:'120% 0px',threshold:0});
@@ -342,7 +364,11 @@ function renderImageFolder(data){
      sentinel.classList.add('fg-image-error');
    },
    count:()=>pages.length,
-   select:i=>{selectedIndex=i;jumpTo(i);}
+   select:i=>{selectedIndex=i;jumpTo(i);},
+   koikatsuCard:valid=>{
+     koikatsu.hidden=!valid;
+     if(valid)koikatsu.title='Open verified native Koikatsu character on PC';
+   }
  };
  view.classList.toggle('fg-image-paged',imageMode==='pages');
  setPosition(0);appendBatch();
