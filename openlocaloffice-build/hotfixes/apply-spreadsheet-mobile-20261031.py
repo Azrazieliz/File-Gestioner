@@ -5,6 +5,9 @@ s=js.read_text()
 anchor="    pageRows:100, pageCols:24, docStart:0, docPageSize:200,"
 assert s.count(anchor)==1
 s=s.replace(anchor,"    pageRows:48, pageCols:12, docStart:0, docPageSize:200,",1)
+window='    const totalRows=Math.max(20,s.rows||0), totalCols=Math.max(12,s.cols||0);'
+assert s.count(window)==1
+s=s.replace(window,"    const totalRows=Math.max(doc.format==='xlsx'?1048576:100000,s.rows||0), totalCols=Math.max(doc.format==='xlsx'?16384:256,s.cols||0);",1)
 s+="""
 ;(()=>{
  'use strict';
@@ -44,8 +47,10 @@ css=Path("app/src/main/assets/style.css")
 css.write_text(css.read_text()+"""
 /* File-specific spreadsheet canvas: no bottom black overlay. */
 body.fg-spreadsheet-reading{overflow:hidden!important}
+body.fg-spreadsheet-reading .bar{padding-top:max(28px,env(safe-area-inset-top,0px))!important;
+ min-height:80px!important}
 body.fg-spreadsheet-reading #work{display:flex!important;flex-direction:column!important;
- height:calc(100dvh - 58px)!important;min-height:0!important;
+ height:calc(100dvh - 84px)!important;min-height:0!important;
  overflow:hidden!important;padding-bottom:env(safe-area-inset-bottom,0px)!important}
 body.fg-spreadsheet-reading #sheetBar{flex:0 0 auto!important;overflow-x:auto!important;
  max-height:100px;padding:5px!important}
