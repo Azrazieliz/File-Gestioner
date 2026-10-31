@@ -212,7 +212,38 @@ s=s.replace(anchor,'''        if(requestCode==FG_TERA_SAVE_REQUEST){
 '''+anchor,1)
 anchor='        @JavascriptInterface public void listLibrary(String folder){loadLibrary(folder);}'
 assert s.count(anchor)==1
-s=s.replace(anchor,'''        @JavascriptInterface public boolean getTeraboxConfigured(){
+s=s.replace(anchor,'''        @JavascriptInterface public void verifyCurrentKoikatsuCard(){
+            final Uri local=currentUri;
+            if(local!=null&&"content".equals(local.getScheme())){
+                verifyKoikatsuInBackground(local,imageStreamToken);
+                return;
+            }
+            final String cloud=fgTbSelectedPath;
+            if(cloud==null||!cloud.toLowerCase(java.util.Locale.ROOT).endsWith(".png"))return;
+            final String token=fgTbToken;
+            fgDirectoryExecutor.execute(()->{
+                java.io.File file=null;
+                try{
+                    file=java.io.File.createTempFile("fg-verified-card-", ".png",getCacheDir());
+                    try(OutputStream output=new BufferedOutputStream(new FileOutputStream(file))){
+                        tb().save(cloud,output);
+                    }
+                    if(!token.equals(fgTbToken)||!cloud.equals(fgTbSelectedPath))return;
+                    final Uri candidate=Uri.fromFile(file);
+                    final boolean verified=KoikatsuCards.isCharacterCard(this,candidate);
+                    if(verified){
+                        currentUri=candidate;fgVerifiedKoikatsuCard=candidate;
+                    }else file.delete();
+                    runOnUiThread(()->js("window.FileGestionerFolder?.koikatsuCard("+verified+")"));
+                    android.util.Log.i("FG_KOIKATSU","USER_CARD_CHECK verified="+verified);
+                }catch(Exception problem){
+                    if(file!=null)file.delete();
+                    runOnUiThread(()->js("window.FileGestionerFolder?.koikatsuCard(false)"));
+                    android.util.Log.w("FG_KOIKATSU","Manual card verification unavailable");
+                }
+            });
+        }
+        @JavascriptInterface public boolean getTeraboxConfigured(){
             return tb().configured();
         }
         @JavascriptInterface public boolean setTeraboxCookie(String token){
