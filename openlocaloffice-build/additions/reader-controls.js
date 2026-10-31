@@ -408,6 +408,9 @@ window.loadDocument=function(data){
      koikatsuCard:data.koikatsuCard===true,
      pages:[{name:data.name,url:data.url||data.src}]
    }:data);
+   // The native openUri path shows appBusy(true) before dispatching. Since
+   // images deliberately bypass the generic document loader, clear it here.
+   window.appBusy?.(false);
    return;
  }
  const result=upstream.apply(this,arguments);
