@@ -7,7 +7,15 @@ main=root/"java/com/openlocal/office/MainActivity.java"
 s=main.read_text()
 anchor='        @JavascriptInterface public void openKoikatsu3d(){'
 assert s.count(anchor)==1
-method=r'''        @JavascriptInterface public String getRemoteToken(){
+method=r'''        @JavascriptInterface public boolean returnToExternalFile(){
+            final Intent intent=getIntent();
+            if(intent!=null&&Intent.ACTION_VIEW.equals(intent.getAction())){
+                runOnUiThread(MainActivity.this::finish);
+                return true;
+            }
+            return false;
+        }
+        @JavascriptInterface public String getRemoteToken(){
             return getSharedPreferences("fg_remote",MODE_PRIVATE)
                 .getString("token","");
         }
