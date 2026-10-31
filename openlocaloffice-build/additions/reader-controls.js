@@ -156,97 +156,193 @@ document.addEventListener('click',e=>{
 function renderImageFolder(data){
  const pages=Array.isArray(data.pages)?[...data.pages]:[];
  const editor=by('#editor');
- if(!editor){
-   console.error('FG_FOLDER: missing document editor');
-   window.FileGestionerLibrary?.show?.();
-   return;
- }
- // The normal loadDocument() initialization is intentionally skipped for
- // folder images; explicitly reveal the same editor surface it would show.
- const work=by('#work');
- work?.classList.remove('hidden');
- work?.removeAttribute('hidden');
- editor.classList.remove('hidden');
- editor.removeAttribute('hidden');
+ if(!editor){window.FileGestionerLibrary?.error?.('Image viewer unavailable');return;}
+ by('#work')?.classList.remove('hidden');
+ by('#work')?.removeAttribute('hidden');
+ editor.classList.remove('hidden');editor.removeAttribute('hidden');
  document.body.classList.add('fg-folder-reading');
- const host=el('div','fg-folder-reader');
+ const host=el('div','fg-folder-reader fg-image-reader');
  const view=el('div','fg-folder-scroll');
- view.setAttribute('role','document');view.setAttribute('aria-label','Folder image reader');
+ view.setAttribute('role','document');
+ view.setAttribute('aria-label','Image collection');
  const stack=el('div','fg-folder-stack');
  const sentinel=el('div','fg-folder-sentinel');
- sentinel.textContent='Loading next images…';
- stack.append(sentinel);view.append(stack);host.append(view);
- editor.replaceChildren(host);
+ sentinel.textContent='Receiving images…';
+ stack.append(sentinel);view.append(stack);
+ const bar=el('nav','fg-image-toolbar');
+ bar.setAttribute('aria-label','Image collection navigation');
+ const close=btn('‹','Back to library',()=>window.FileGestionerLibrary?.show?.());
+ const previous=btn('‹','Previous image',()=>moveImage(-1));
+ const next=btn('›','Next image',()=>moveImage(1));
+ const modeButton=btn('Pages','Switch to page-by-page images',()=>switchMode());
+ const position=el('span','fg-image-position','0 / …');
+ const collapse=btn('⌄','Toggle image controls',()=>bar.classList.toggle('fg-image-toolbar-small'));
+ bar.append(close,previous,position,next,modeButton,collapse);
+ host.append(view,bar);editor.replaceChildren(host);
  for(const id of ['sheetBar','spreadsheetTools','textFormat','notice'])
-  by('#'+id)?.classList.add('hidden');
- let imageObserver=null,batchObserver=null,index=0,finished=false,busy=false;
+   by('#'+id)?.classList.add('hidden');
+ let imageObserver=null,batchObserver=null,index=0,current=0,finished=false,busy=false;
+ let imageMode=data.standalone?'pages':'scroll';
+ let selectedIndex=pages.findIndex(p=>p?.selected);
+ function updateRotation(img){
+   if(!img?.naturalWidth||!img?.naturalHeight)return;
+   const section=img.parentElement;
+   if(!section)return;
+   // A wide image in portrait is rotated only for screen-filling page mode.
+   section.classList.toggle('fg-image-rotated',
+     imageMode==='pages'&&window.innerHeight>window.innerWidth &&
+     img.naturalWidth>img.naturalHeight*1.18);
+ }
+ function refreshRotation(){
+   host.querySelectorAll('.fg-folder-image').forEach(updateRotation);
+ }
+ function pageSections(){return stack.querySelectorAll('.fg-folder-page');}
+ function setPosition(i){
+   current=Math.max(0,Math.min(Math.max(0,pages.length-1),i));
+   position.textContent=pages.length?(current+1)+' / '+pages.length+(finished?'':'+'):'0 / …';
+   previous.disabled=current===0;
+   next.disabled=finished&&current+1>=pages.length;
+ }
  function appendBatch(){
-  if(!host.isConnected){imageObserver?.disconnect();batchObserver?.disconnect();return;}
-  if(busy||index>=pages.length)return;
-  busy=true;
-  const frag=document.createDocumentFragment();
-  const end=Math.min(pages.length,index+48);
-  while(index<end){
-   const i=index++,page=pages[i];
-   if(!page?.url)continue;
-   const section=el('section','fg-folder-page');
-   section.dataset.page=String(i+1);
-   const image=el('img','fg-folder-image');
-   image.alt=page.name||'Image '+i;image.loading='lazy';
-   image.decoding='async';image.dataset.src=page.url;
-   section.append(image);frag.append(section);
-   if(imageObserver)imageObserver.observe(image);
-   else image.src=page.url;
-  }
-  stack.insertBefore(frag,sentinel);
-  busy=false;
-  sentinel.textContent=finished?
-   (index<pages.length?'Continue reading…':'End of folder'):
-   (index<pages.length?'Continue reading…':'Receiving more images…');
-  // The sentinel observer adds the next batch when it enters the viewport.
- }
- if(window.IntersectionObserver){
-  imageObserver=new IntersectionObserver(records=>{
-   for(const record of records){
-    if(!record.isIntersecting)continue;
-    const img=record.target;imageObserver.unobserve(img);
-    if(img.dataset.src)img.src=img.dataset.src;
+   if(!host.isConnected){imageObserver?.disconnect();batchObserver?.disconnect();return;}
+   if(busy||index>=pages.length)return;
+   busy=true;
+   const frag=document.createDocumentFragment();
+   const end=Math.min(pages.length,index+32);
+   const initial=index;
+   while(index<end){
+     const i=index++,page=pages[i];
+     if(!page?.url)continue;
+     const section=el('section','fg-folder-page');
+     section.dataset.page=String(i+1);
+     const image=el('img','fg-folder-image');
+     image.alt=page.name||'Image '+(i+1);
+     image.loading='lazy';image.decoding='async';image.dataset.src=page.url;
+     image.addEventListener('load',()=>updateRotation(image));
+     image.addEventListener('error',()=>{
+       if(!section.isConnected)return;
+       let retry=section.querySelector('.fg-image-retry');
+       if(retry)return;
+       retry=btn('Retry image','Reload this image from storage',()=>{
+         retry.remove();
+         image.src=page.url+(page.url.includes('?')?'&':'?')+'retry='+Date.now();
+       });
+       retry.classList.add('fg-image-retry');
+       section.append(retry);
+       window.AndroidBridge?.readerDiagnostic?.('IMAGE_LOAD_ERROR');
+     });
+     section.append(image);frag.append(section);
+     if(imageObserver)imageObserver.observe(image);
+     else image.src=page.url;
    }
-  },{root:view,rootMargin:'120% 0px',threshold:0});
-  batchObserver=new IntersectionObserver(records=>{
-   for(const r of records)if(r.isIntersecting)appendBatch();
-  },{root:view,rootMargin:'160% 0px',threshold:0});
-  batchObserver.observe(sentinel);
+   stack.insertBefore(frag,sentinel);
+   busy=false;
+   if(selectedIndex>=initial && selectedIndex<end)requestAnimationFrame(()=>jumpTo(selectedIndex));
+   if(index>=pages.length)sentinel.textContent=finished?'End of collection':'Receiving more images…';
+   else sentinel.textContent='Continue reading…';
+   if(!pages.length)setPosition(0);
  }
- const add=incoming=>{
-  if(!host.isConnected)return;
-  if(!Array.isArray(incoming))return;
-  pages.push(...incoming);
-  if(index<pages.length&&
+ function ensureRendered(target){
+   let limit=0;
+   while(index<=target && index<pages.length && limit++<5)appendBatch();
+   if(index<=target)setTimeout(()=>{if(host.isConnected)ensureRendered(target);},0);
+ }
+ function jumpTo(target){
+   if(target<0||target>=pages.length)return;
+   ensureRendered(target);
+   const section=pageSections()[target];
+   if(!section){setTimeout(()=>{if(host.isConnected)jumpTo(target);},45);return;}
+   view.scrollTo({top:section.offsetTop-stack.offsetTop,behavior:'auto'});
+   setPosition(target);
+ }
+ function moveImage(delta){
+   if(!pages.length)return;
+   const target=current+delta;
+   if(target<0||target>=pages.length)return;
+   jumpTo(target);
+ }
+ function switchMode(){
+   imageMode=imageMode==='pages'?'scroll':'pages';
+   view.classList.toggle('fg-image-paged',imageMode==='pages');
+   modeButton.textContent=imageMode==='pages'?'Scroll':'Pages';
+   modeButton.title=imageMode==='pages'?'Switch to continuous images':'Switch to page-by-page images';
+   refreshRotation();
+   requestAnimationFrame(()=>jumpTo(current));
+ }
+ function updateCurrent(){
+   const sections=pageSections();
+   if(!sections.length)return;
+   const focus=view.getBoundingClientRect().top+(imageMode==='pages'?.48:.28)*view.clientHeight;
+   let best=0,bestDistance=Infinity;
+   for(let i=0;i<sections.length;i++){
+     const r=sections[i].getBoundingClientRect();
+     const d=focus<r.top?r.top-focus:focus>r.bottom?focus-r.bottom:0;
+     if(d<bestDistance){bestDistance=d;best=i;if(!d)break;}
+   }
+   setPosition(best);
+ }
+ let frame=0;
+ view.addEventListener('scroll',()=>{
+   if(frame)return;
+   frame=requestAnimationFrame(()=>{frame=0;updateCurrent();});
+ },{passive:true});
+ if(window.IntersectionObserver){
+   imageObserver=new IntersectionObserver(records=>{
+     for(const record of records){
+       if(!record.isIntersecting)continue;
+       const img=record.target;imageObserver.unobserve(img);
+       if(img.dataset.src)img.src=img.dataset.src;
+     }
+   },{root:view,rootMargin:'110% 0px',threshold:0});
+   batchObserver=new IntersectionObserver(records=>{
+     for(const record of records)if(record.isIntersecting)appendBatch();
+   },{root:view,rootMargin:'120% 0px',threshold:0});
+   batchObserver.observe(sentinel);
+ }
+ function add(incoming){
+   if(!host.isConnected||!Array.isArray(incoming))return;
+   const from=pages.length;
+   pages.push(...incoming);
+   if(selectedIndex<0){
+     const found=incoming.findIndex(p=>p?.selected);
+     if(found>=0)selectedIndex=from+found;
+   }
+   if(index<pages.length&&
      (index===0||sentinel.getBoundingClientRect().top<
        view.getBoundingClientRect().bottom+view.clientHeight))
-    requestAnimationFrame(appendBatch);
-  sentinel.textContent='Receiving '+pages.length+' images…';
- };
+     requestAnimationFrame(appendBatch);
+   setPosition(current);
+ }
  window.FileGestionerFolder={
-  append:payload=>add(payload?.pages),
-  done:total=>{finished=true;sentinel.textContent=
-   index<pages.length?'Continue reading…':'All '+total+' images received';},
-  count:()=>pages.length
+   append:payload=>add(payload?.pages),
+   done:total=>{finished=true;
+     sentinel.textContent=index<pages.length?'Continue reading…':'End of collection';
+     setPosition(current);},
+   failed:message=>{
+     sentinel.textContent='Cloud folder unavailable: '+message;
+     sentinel.classList.add('fg-image-error');
+   },
+   count:()=>pages.length,
+   select:i=>{selectedIndex=i;jumpTo(i);}
  };
- appendBatch();
+ view.classList.toggle('fg-image-paged',imageMode==='pages');
+ setPosition(0);appendBatch();
+ if(selectedIndex>=0)requestAnimationFrame(()=>jumpTo(selectedIndex));
+ window.addEventListener('resize',refreshRotation,{passive:true,once:true});
 }
 const upstream=window.loadDocument;
 window.loadDocument=function(data){
  reading=data;remove();
- if(data?.type==='folderImages'){
-   // Existing generic loader has no "folderImages" type. Calling it first
-   // can throw or replace the editor after the folder image view was made.
+ if(data?.type==='folderImages'||(data?.type==='image'&&!data.koikatsuCard)){
+   // Image collections and ordinary pictures have their own navigation,
+   // never the EPUB/PDF dock. Koikatsu retains its 3D-specific interface.
    document.getElementById('home')?.classList.add('hidden');
    document.getElementById('work')?.classList.remove('hidden');
    window.FileGestionerLibrary?.hideForReader?.();
-   renderImageFolder(data);
-   requestAnimationFrame(()=>requestAnimationFrame(attach));
+   renderImageFolder(data.type==='image'?{
+     type:'folderImages',standalone:true,
+     pages:[{name:data.name,url:data.url||data.src}]
+   }:data);
    return;
  }
  const result=upstream.apply(this,arguments);
