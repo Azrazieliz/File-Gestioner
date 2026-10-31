@@ -29,32 +29,64 @@ public final class ReaderLibrary {
     }
     public static Listing stream(Context ctx,Uri tree,String folderId,
                                  BatchSink sink) throws Exception {
-        String root=DocumentsContract.getTreeDocumentId(tree);
-        String id=folderId==null||folderId.isBlank()?root:folderId;
-        Uri children=DocumentsContract.buildChildDocumentsUriUsingTree(tree,id);
-        String[] cols={DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+        final String root=DocumentsContract.getTreeDocumentId(tree);
+        final String id=folderId==null||folderId.isBlank()?root:folderId;
+        final Uri treeChildren=DocumentsContract.buildChildDocumentsUriUsingTree(tree,id);
+        final String[] projection={DocumentsContract.Document.COLUMN_DOCUMENT_ID,
             DocumentsContract.Document.COLUMN_DISPLAY_NAME,
             DocumentsContract.Document.COLUMN_MIME_TYPE,
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED};
+        Cursor cursor=null;
+        Exception queryError=null;
+        // Some cloud DocumentProviders (including proxy providers) reject
+        // optional metadata columns, or return null for tree-scoped queries.
+        for(int attempt=0;attempt<4&&cursor==null;attempt++){
+            Uri target=attempt<2?treeChildren:
+                DocumentsContract.buildChildDocumentsUri(tree.getAuthority(),id);
+            String[] cols=attempt%2==0?projection:new String[]{
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE};
+            try{
+                cursor=ctx.getContentResolver().query(target,cols,null,null,null);
+            }catch(Exception e){queryError=e;}
+        }
+        if(cursor==null){
+            throw new java.io.IOException(
+                "The document provider could not list this directory"+
+                (queryError!=null?": "+queryError.getMessage():" (empty response)"),
+                queryError);
+        }
+        int rows=0;
         JSONArray batch=new JSONArray();
         boolean firstBatch=true;
-        try(Cursor cursor=ctx.getContentResolver().query(children,cols,null,null,null)){
-            if(cursor==null)throw new java.io.IOException("Folder provider returned no cursor");
-            while(cursor.moveToNext()){
-                String did=cursor.getString(0),name=cursor.getString(1),mime=cursor.getString(2);
-                if(name==null||did==null||mime==null)continue;
-                boolean folder=DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
-                // A file manager must show every regular file, not just the reader whitelist.
+        try(Cursor items=cursor){
+            final int ixId=items.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID);
+            final int ixName=items.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME);
+            final int ixMime=items.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE);
+            final int ixSize=items.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE);
+            final int ixModified=items.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED);
+            if(ixId<0||ixName<0)throw new java.io.IOException(
+                "Storage provider omitted file ID or name");
+            while(items.moveToNext()){
+                if(items.isNull(ixId)||items.isNull(ixName))continue;
+                final String did=items.getString(ixId),name=items.getString(ixName);
+                if(name==null||name.isBlank()||did==null||did.isBlank())continue;
+                final String mime=ixMime>=0&&!items.isNull(ixMime)?
+                    items.getString(ixMime):"application/octet-stream";
+                final boolean folder=DocumentsContract.Document.MIME_TYPE_DIR.equals(mime);
                 JSONObject item=new JSONObject();
                 item.put("id",did).put("title",stripExtension(name))
                     .put("name",name).put("mime",mime)
                     .put("folder",folder)
-                    .put("size",cursor.isNull(3)?-1L:cursor.getLong(3))
-                    .put("modified",cursor.isNull(4)?0L:cursor.getLong(4))
+                    .put("size",ixSize>=0&&!items.isNull(ixSize)?items.getLong(ixSize):-1L)
+                    .put("modified",ixModified>=0&&!items.isNull(ixModified)?
+                        items.getLong(ixModified):0L)
                     .put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,did).toString());
                 batch.put(item);
-                if(batch.length()>=(firstBatch?12:96)){
+                rows++;
+                if(batch.length()>=(firstBatch?1:48)){
                     sink.accept(id,batch,false);
                     firstBatch=false;
                     batch=new JSONArray();
@@ -62,6 +94,8 @@ public final class ReaderLibrary {
             }
         }
         sink.accept(id,batch,true);
+        android.util.Log.i("FG_FOLDER","SAF_METADATA_FINISHED count="+rows+
+            " authority="+tree.getAuthority());
         return new Listing(id,new JSONArray());
     }
 
