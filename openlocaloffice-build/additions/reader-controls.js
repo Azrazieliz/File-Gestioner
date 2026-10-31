@@ -51,7 +51,8 @@ function update(){
 }
 function schedule(){if(frame)return;frame=requestAnimationFrame(()=>{frame=0;update();});}
 function pageMode(next){
- mode=next;save('mode',mode);
+ mode=next;const type=by('.fg-book-scroll')?'epub':by('.fg-pdf-scroll')?'pdf':by('.fg-archive-scroll')||by('.fg-progressive-scroll')?'comic':'text';
+ save('mode:'+type,mode);
  scroller?.classList.toggle('fg-control-pages',mode==='pages');
  const toggle=controls?.querySelector('.fg-control-mode');
  if(toggle)toggle.textContent=mode==='pages'?'Pages':'Scroll';
@@ -124,15 +125,22 @@ function attach(){
  remove();scroller=next;
  controls=el('section','fg-controls');controls.setAttribute('aria-label','Reader navigation');
  const row=el('div','fg-control-row');
- row.append(
-  btn('‹','Back to collection',()=>window.FileGestionerLibrary?.show?.()),
-  btn('⇤','Previous book',()=>window.FileGestionerLibrary?.openSibling?.(-1)),
-  btn('◀','Previous page',()=>move(-1)),
-  btn('▶','Next page',()=>move(1)),
-  btn('⇥','Next book',()=>window.FileGestionerLibrary?.openSibling?.(1)));
- const toggle=btn('Scroll','Switch between scrolling and page mode',()=>pageMode(mode==='pages'?'scroll':'pages'));
- toggle.classList.add('fg-control-mode');row.append(toggle,btn('Aa','Reader font and colors',appearance));
- row.append(btn('▾','Minimize controls',()=>controls.classList.toggle('fg-controls-mini')));
+ const book=Boolean(by('.fg-book-scroll')||by('.fg-book-article'));
+ const pdf=Boolean(by('.fg-pdf-scroll')||reading?.type==='pdf');
+ const comic=Boolean(by('.fg-archive-scroll')||by('.fg-progressive-scroll'));
+ const textReader=Boolean(by('.fg-text-scroll')||reading?.type==='text');
+ row.append(btn('‹','Back to library',()=>window.FileGestionerLibrary?.show?.()));
+ if(book)row.append(btn('⇤','Previous book',()=>window.FileGestionerLibrary?.openSibling?.(-1)));
+ row.append(btn('◀',book?'Previous chapter/page':'Previous page',()=>move(-1)));
+ row.append(btn('▶',book?'Next chapter/page':'Next page',()=>move(1)));
+ if(book)row.append(btn('⇥','Next book',()=>window.FileGestionerLibrary?.openSibling?.(1)));
+ if(book||pdf||comic){
+   const toggle=btn('Scroll','Switch scrolling/page mode',
+     ()=>pageMode(mode==='pages'?'scroll':'pages'));
+   toggle.classList.add('fg-control-mode');row.append(toggle);
+ }
+ if(book||textReader)row.append(btn('Aa','Text size, colors and font',appearance));
+ row.append(btn('▾','Minimize document controls',()=>controls.classList.toggle('fg-controls-mini')));
  controls.append(row);
  const scrub=el('div','fg-control-row fg-control-scrub');
  const slider=el('input','fg-control-progress');slider.type='range';slider.min=0;slider.max=1000;slider.step=1;
@@ -146,7 +154,7 @@ function attach(){
   const rect=scroller.getBoundingClientRect(),x=e.clientX-rect.left;
   if(x<rect.width*.17)move(-1);else if(x>rect.width*.83)move(1);
  });
- pageMode(saved('mode','scroll'));useStyle();update();
+ pageMode(saved('mode:'+(book?'epub':pdf?'pdf':comic?'comic':'text'),'scroll'));useStyle();update();
 }
 document.addEventListener('click',e=>{
  const img=e.target?.closest?.('.fg-book img,.fg-document-sheet img,.fg-folder-page img');
