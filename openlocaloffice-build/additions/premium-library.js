@@ -316,6 +316,7 @@ function card(item,i){
    openBook(item);
  });
  tile.addEventListener('keydown',e=>{
+   if(e.target!==tile)return;
    if(e.key==='Enter'||e.key===' '){e.preventDefault();openBook(item);}
  });
  return tile;
@@ -518,6 +519,7 @@ window.loadDocument=function(payload){
  return upstreamLoad(payload);
 };
 function handleAndroidBack(){
+ if(operationDialog){closeFileActions();return true;}
  if(window.FileGestionerReading?.handleBack?.())return true;
  // Reading settings are a modal surface, not an exit command.
  const drawer=document.querySelector('.fg-book-drawer:not(.fg-book-hidden)');
