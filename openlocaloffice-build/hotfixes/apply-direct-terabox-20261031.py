@@ -10,8 +10,12 @@ s=main.read_text()
 anchor='    private void loadLibrary(String folder){'
 assert s.count(anchor)==1
 impl=r'''    private static final int FG_TERA_SAVE_REQUEST=2027;
-    private final com.openlocal.office.core.FgTeraboxClient fgTerabox=
-        new com.openlocal.office.core.FgTeraboxClient(this);
+    private volatile com.openlocal.office.core.FgTeraboxClient fgTerabox;
+    private synchronized com.openlocal.office.core.FgTeraboxClient tb(){
+        if(fgTerabox==null)
+            fgTerabox=new com.openlocal.office.core.FgTeraboxClient(this);
+        return fgTerabox;
+    }
     private final java.util.concurrent.atomic.AtomicLong fgTbVersion=
         new java.util.concurrent.atomic.AtomicLong();
     private volatile String fgTbToken=java.util.UUID.randomUUID().toString();
@@ -35,11 +39,11 @@ impl=r'''    private static final int FG_TERA_SAVE_REQUEST=2027;
         fgDirectoryExecutor.execute(()->{
             final long start=android.os.SystemClock.elapsedRealtime();
             try{
-                if(!fgTerabox.configured())throw new IOException("Connect a TeraBox ndus cookie first");
+                if(!tb().configured())throw new IOException("Connect a TeraBox ndus cookie first");
                 int total=0;
                 for(int page=1;page<=10000;page++){
                     if(version!=fgTbVersion.get())return;
-                    org.json.JSONArray cloud=fgTerabox.listPage(requested,page);
+                    org.json.JSONArray cloud=tb().listPage(requested,page);
                     org.json.JSONArray batch=new org.json.JSONArray();
                     for(int i=0;i<cloud.length();i++){
                         org.json.JSONObject row=cloud.optJSONObject(i);
@@ -104,7 +108,7 @@ impl=r'''    private static final int FG_TERA_SAVE_REQUEST=2027;
                     cached=java.io.File.createTempFile("tb-card-", ".png",getCacheDir());
                     final java.io.File target=cached;
                     try(OutputStream out=new java.io.BufferedOutputStream(new FileOutputStream(target))){
-                        fgTerabox.save(path,out);
+                        tb().save(path,out);
                     }
                     if(!token.equals(fgTbToken)||!path.equals(fgTbSelectedPath))return;
                     final Uri uri=Uri.fromFile(target);
@@ -157,7 +161,7 @@ impl=r'''    private static final int FG_TERA_SAVE_REQUEST=2027;
             int index=Integer.parseInt(parts[3]);
             TbPage item=fgTbPages.get(index);
             if(item==null)throw new IOException("Image is not in this collection");
-            InputStream stream=fgTerabox.open(item.path);
+            InputStream stream=tb().open(item.path);
             return new WebResourceResponse(
                 com.openlocal.office.core.FgTeraboxClient.mime(item.name),null,stream);
         }catch(Exception problem){
@@ -182,7 +186,7 @@ impl=r'''    private static final int FG_TERA_SAVE_REQUEST=2027;
         fgDirectoryExecutor.execute(()->{
             try(OutputStream target=getContentResolver().openOutputStream(outputUri,"wt")){
                 if(target==null)throw new IOException("Save location refused output stream");
-                fgTerabox.save(path,target);
+                tb().save(path,target);
                 runOnUiThread(()->js("window.FileGestionerLibrary?.loadingStatus("+
                     q("Cloud file saved successfully.")+")"));
             }catch(Exception error){
@@ -209,14 +213,14 @@ s=s.replace(anchor,'''        if(requestCode==FG_TERA_SAVE_REQUEST){
 anchor='        @JavascriptInterface public void listLibrary(String folder){loadLibrary(folder);}'
 assert s.count(anchor)==1
 s=s.replace(anchor,'''        @JavascriptInterface public boolean getTeraboxConfigured(){
-            return fgTerabox.configured();
+            return tb().configured();
         }
         @JavascriptInterface public boolean setTeraboxCookie(String token){
-            return fgTerabox.setCookie(token);
+            return tb().setCookie(token);
         }
         @JavascriptInterface public void disconnectTerabox(){
             fgTbVersion.incrementAndGet();
-            fgTerabox.disconnect();
+            tb().disconnect();
             fgTbToken=java.util.UUID.randomUUID().toString();
         }
         @JavascriptInterface public void listTerabox(String folder){
