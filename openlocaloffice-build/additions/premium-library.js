@@ -51,7 +51,7 @@ const categories=[
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 let activeVersion=null,scanning=false,pageStart=0,renderTimer=0;
-let imagePumpVersion=0;
+let imagePumpVersion=0,imagePumpState=null;
 const PAGE=96;
 function classify(entry){
  if(entry.folder)return 'folder';
@@ -101,19 +101,10 @@ function openBook(item){
    const siblings=entries.filter(x=>!x.folder&&classify(x)==='image')
      .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
    const version=++imagePumpVersion;
+   imagePumpState={version,siblings,offset:0,started:false};
+   // Native loads the viewer first. It notifies us after installing the
+   // image-reader callback, so no early Round Sync batch can be lost.
    bridge().beginImageCollection(item.uri);
-   let offset=0;
-   const feed=()=>{
-     if(imagePumpVersion!==version)return;
-     if(offset>=siblings.length){
-       bridge()?.finishImageCollection?.();return;
-     }
-     const batch=siblings.slice(offset,offset+64).map(x=>({uri:x.uri,name:x.name}));
-     offset+=64;
-     bridge()?.appendImageCollectionChunk?.(JSON.stringify(batch));
-     setTimeout(feed,0);
-   };
-   setTimeout(feed,0);
  }else if(classify(item)==='image' && bridge()?.openImageInFolder){
    bridge().openImageInFolder(currentFolder,item.uri);
  }else{
@@ -295,7 +286,7 @@ function navigateBack(){
  show();
 }
 function show(){
- imagePumpVersion++;
+ imagePumpVersion++;imagePumpState=null;
  window.FileGestionerReading?.close?.();
  document.body.classList.remove('fg-folder-reading');
  visible=true;root.classList.remove('fg-lib-hidden');
@@ -383,6 +374,23 @@ function handleAndroidBack(){
 }
 window.FileGestionerLibrary={
  show,receive,append,error,handleBack:handleAndroidBack,enterFolder,openSibling,
+ imageReaderReady:()=>{
+   const state=imagePumpState;
+   if(!state||state.started||state.version!==imagePumpVersion)return;
+   state.started=true;
+   const feed=()=>{
+     if(imagePumpState!==state||imagePumpVersion!==state.version)return;
+     if(state.offset>=state.siblings.length){
+       bridge()?.finishImageCollection?.();imagePumpState=null;return;
+     }
+     const batch=state.siblings.slice(state.offset,state.offset+64)
+       .map(x=>({uri:x.uri,name:x.name}));
+     state.offset+=64;
+     bridge()?.appendImageCollectionChunk?.(JSON.stringify(batch));
+     setTimeout(feed,0);
+   };
+   feed();
+ },
  isVisible:()=>visible,
  openCollection:()=>{
    currentFolder='';stack=[];show();
