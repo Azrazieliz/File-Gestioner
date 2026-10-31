@@ -9,6 +9,7 @@ const media=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgMedia
 const growing=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgGrowingMediaDataSource.java','utf8');
 assert(!lib.includes("if(item.folder){\n   bridge()?.openImageFolder"),'Folder overlay is still blocking image pages');
 assert(lib.includes("enterFolder(item.id);return;"),'Folders must browse normally rather than force image reading');
+assert(js.includes('window.appBusy?.(false);'),'Image open path leaves busy spinner displayed indefinitely');
 assert(js.includes("if(data?.type==='folderImages'||data?.type==='image')"),'Dedicated image route absent');
 const block=js.slice(js.indexOf("window.loadDocument=function(data){"));
 assert(block.includes("renderImageFolder(data.type==='image'?{") &&
