@@ -122,9 +122,10 @@ jobs:
           python3 ../hotfixes/apply-native-file-actions-20261031.py
           python3 ../hotfixes/apply-library-transfer-20261031.py
           python3 ../hotfixes/apply-spreadsheet-mobile-20261031.py
+          python3 ../hotfixes/apply-file-conversion-20261031.py
           cp ../additions/FgMediaPlayer.java app/src/main/java/com/openlocal/office/core/FgMediaPlayer.java
           cp ../additions/FgGrowingMediaDataSource.java app/src/main/java/com/openlocal/office/core/FgGrowingMediaDataSource.java
-          python3 -m py_compile ../hotfixes/apply-scale-library-20261031.py ../hotfixes/apply-scale-media-20261031.py ../hotfixes/apply-streamed-image-folders-20261031.py
+          python3 -m py_compile ../hotfixes/apply-scale-library-20261031.py ../hotfixes/apply-scale-media-20261031.py ../hotfixes/apply-streamed-image-folders-20261031.py ../hotfixes/apply-file-conversion-20261031.py
           grep -Fq 'ReaderLibrary.stream(' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'androidx.media3:media3-exoplayer:1.11.1' app/build.gradle.kts
           grep -Fq 'FgMediaPlayer' app/src/main/java/com/openlocal/office/MainActivity.java
@@ -132,6 +133,8 @@ jobs:
           grep -Fq 'canManageLibraryFiles' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'copyLibraryFile' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'moveLibraryFile' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'convertLibraryFile' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'checkCollectionKoikatsu' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'fg-spreadsheet-reading' app/src/main/assets/style.css
           node --check app/src/main/assets/app.js
           node --check app/src/main/assets/premium-library.js
