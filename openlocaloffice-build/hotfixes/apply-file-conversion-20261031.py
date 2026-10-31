@@ -55,8 +55,8 @@ s=s.replace(anchor,'''    private volatile Uri fgConvertSource;
             try{
                 String low=displayName(source).toLowerCase(java.util.Locale.ROOT);
                 if(low.endsWith(".csv")||low.endsWith(".tsv")){
-                    char from=low.endsWith(".csv")?',':'\\t';
-                    char to="csv".equals(format)?',':'\\t';
+                    char from=low.endsWith(".csv")?',':(char)9;
+                    char to="csv".equals(format)?',':(char)9;
                     try(java.io.Reader input=new java.io.BufferedReader(
                              new java.io.InputStreamReader(
                                  getContentResolver().openInputStream(source),
@@ -137,9 +137,11 @@ s=s.replace(anchor,'''    private volatile Uri fgConvertSource;
                 }
                 final String ok="Converted to "+format.toUpperCase(java.util.Locale.ROOT)+
                     ". Original preserved.";
+                final String successJson=new org.json.JSONObject()
+                    .put("operation","convert").put("ok",true)
+                    .put("detail",ok).toString();
                 runOnUiThread(()->js("window.FileGestionerLibrary?.operationResult("+
-                    new org.json.JSONObject().put("operation","convert")
-                        .put("ok",true).put("detail",ok).toString()+")"));
+                    successJson+")"));
                 android.util.Log.i("FG_CONVERT","CONVERT_OK format="+format);
             }catch(Exception e){
                 android.util.Log.e("FG_CONVERT","CONVERT_ERROR",e);
