@@ -179,7 +179,7 @@ function renderImageFolder(data){
  stack.append(sentinel);view.append(stack);
  const bar=el('nav','fg-image-toolbar');
  bar.setAttribute('aria-label','Image collection navigation');
- const close=btn('‹','Back to library',()=>window.FileGestionerLibrary?.show?.());
+ const close=btn('‹','Back to files',()=>closeCollection());
  const previous=btn('‹','Previous image',()=>moveImage(-1));
  const next=btn('›','Next image',()=>moveImage(1));
  const modeButton=btn('Pages','Switch to page-by-page images',()=>switchMode());
@@ -188,12 +188,18 @@ function renderImageFolder(data){
  const koikatsu=btn('3D','Open genuine Koikatsu card with the connected PC',
    ()=>window.FileGestionerRemoteViewer?.open('koikatsu'));
  koikatsu.classList.add('fg-image-koikatsu');
- koikatsu.hidden=true;
+ koikatsu.hidden=!Boolean(data.koikatsuCard);
  bar.append(close,previous,position,next,modeButton,koikatsu,collapse);
  host.append(view,bar);editor.replaceChildren(host);
  for(const id of ['sheetBar','spreadsheetTools','textFormat','notice'])
    by('#'+id)?.classList.add('hidden');
  let imageObserver=null,batchObserver=null,index=0,current=0,finished=false,busy=false;
+ function closeCollection(){
+   // ACTION_VIEW from Files/RoundSync should return to that app instead
+   // of showing an empty File Gestioner library.
+   if(window.AndroidBridge?.returnToExternalFile?.())return;
+   window.FileGestionerLibrary?.show?.();
+ }
  let imageMode=data.standalone?'pages':'scroll';
  let selectedIndex=pages.findIndex(p=>p?.selected);
  function updateRotation(img){
@@ -379,14 +385,15 @@ function renderImageFolder(data){
 const upstream=window.loadDocument;
 window.loadDocument=function(data){
  reading=data;remove();
- if(data?.type==='folderImages'||(data?.type==='image'&&!data.koikatsuCard)){
-   // Image collections and ordinary pictures have their own navigation,
-   // never the EPUB/PDF dock. Koikatsu retains its 3D-specific interface.
+ if(data?.type==='folderImages'||data?.type==='image'){
+   // Every native image, including authentic Koikatsu PNG cards, belongs in
+   // the image reader. Do not let its character marker fall through to EPUB.
    document.getElementById('home')?.classList.add('hidden');
    document.getElementById('work')?.classList.remove('hidden');
    window.FileGestionerLibrary?.hideForReader?.();
    renderImageFolder(data.type==='image'?{
      type:'folderImages',standalone:true,
+     koikatsuCard:data.koikatsuCard===true,
      pages:[{name:data.name,url:data.url||data.src}]
    }:data);
    return;
@@ -397,7 +404,12 @@ window.loadDocument=function(data){
 };
 window.FileGestionerReading={
  attach,close:remove,handleBack:()=>{if(lightbox){closeImage();return true;}
-  if(settings){closeSettings();return true;}return false;},
+  if(settings){closeSettings();return true;}
+  if(document.body.classList.contains('fg-folder-reading')){
+    if(window.AndroidBridge?.returnToExternalFile?.())return true;
+    window.FileGestionerLibrary?.show?.();return true;
+  }
+  return false;},
  version:'0.14.0'
 };
 })();
