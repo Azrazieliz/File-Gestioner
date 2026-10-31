@@ -39,7 +39,7 @@ async function render(){
     const previous=frame.dataset.objectUrl;
     frame.src=objectUrl;frame.dataset.objectUrl=objectUrl;
     if(previous)URL.revokeObjectURL(previous);
-    setStatus('PC-rendered 3D · drag to orbit · pinch to zoom');
+    setStatus('Native frame received · drawing…');
   }catch(e){setStatus(String(e.message||e));}
   finally{
     busy=false;
@@ -64,7 +64,10 @@ async function awaitNativeReady(sid){
 function onOpen(response){
   try{
     const data=typeof response==='string'?JSON.parse(response):response;
-    if(data.error){setStatus(data.error);return;}
+    // Native Studio may accept the upload before it finishes loading.
+    // A pending session must stay alive even when the bridge supplied an
+    // informative warning; otherwise character renders never start.
+    if(data.error&&!data.session){setStatus(data.error);return;}
     active=data.session||null;
     setStatus(data.ready?'Connected · preparing native 3D…':
       (data.error||'Native renderer is not yet online'));
@@ -91,7 +94,12 @@ function open(nextKind='cube'){
   // Do not show the token, password field, or recurring Pair prompts.
   viewport=el('div','fg-pc-viewport');
   frame=el('img','fg-pc-frame');frame.alt='Remote native 3D scene';
-  frame.draggable=false;viewport.append(frame);overlay.append(viewport);
+  frame.draggable=false;frame.hidden=true;
+  frame.onload=()=>{if(!dead){frame.hidden=false;setStatus('PC-native 3D · drag to orbit · pinch to zoom');}};
+  frame.onerror=()=>{if(!dead){frame.hidden=true;setStatus('Remote frame could not be displayed. Retry connection.');}};
+  const placeholder=el('div','fg-pc-placeholder','Opening native 3D renderer on the connected PC…');
+  viewport.append(placeholder,frame);overlay.append(viewport);
+  frame.addEventListener('load',()=>{placeholder.hidden=true;});
   status=el('div','fg-pc-status','Not connected');
   overlay.append(status);
   const actions=el('div','fg-pc-actions');
