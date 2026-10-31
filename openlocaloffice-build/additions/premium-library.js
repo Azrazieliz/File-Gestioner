@@ -505,6 +505,13 @@ function navigateBack(){
  if(stack.length){currentFolder=stack.pop();request();return;}
  show();
 }
+function hideForReader(){
+ // External ACTION_VIEW images may reach window.loadDocument before the
+ // library initializes. Never cover the active image with the welcome page.
+ visible=false;root.classList.add('fg-lib-hidden');
+ document.getElementById('home')?.classList.add('hidden');
+ document.getElementById('work')?.classList.remove('hidden');
+}
 function show(){
  pendingFolderImageRead=null;
  closeFileActions();
@@ -624,7 +631,7 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,receive,append,error,operationResult,transferProgress,handleBack:handleAndroidBack,enterFolder,openSibling,
+ show,hideForReader,receive,append,error,operationResult,transferProgress,handleBack:handleAndroidBack,enterFolder,openSibling,
  imageReaderReady:()=>{
    const state=imagePumpState;
    if(!state||state.started||state.version!==imagePumpVersion)return;
@@ -653,7 +660,8 @@ const initializeLibrary=()=>{
  // Handle both early page loads and scripts loaded after DOMContentLoaded.
  if(window.__fgLibraryInitialized)return;
  window.__fgLibraryInitialized=true;
- show();
+ if(document.body.classList.contains('fg-folder-reading'))hideForReader();
+ else show();
  bridge()?.readerDiagnostic?.('LIBRARY_READY');
 };
 if(document.readyState==='loading')
