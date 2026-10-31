@@ -34,7 +34,12 @@ assert(lower!==-1&&sniff!==-1&&lower<sniff,
   'MP4 must be opened without slow image/content sniffing');
 const libFile=fs.readFileSync('app/src/main/java/com/openlocal/office/core/ReaderLibrary.java','utf8');
 assert(libFile.includes('public static Listing stream('),'Incremental folder enumeration missing');
-assert(libFile.includes('if(batch.length()>=(firstBatch?1:48))') && libFile.includes('for(int attempt=0;attempt<4&&cursor==null;attempt++)'),'Cloud SAF must show the first available file and retry reduced-column provider queries');
+assert(libFile.includes('if(batch.length()>=(firstBatch?1:48))') &&
+       libFile.includes('candidate.moveToFirst()') &&
+       libFile.includes('SAF_CHILDREN_EMPTY method=') &&
+       libFile.includes('do{') &&
+       libFile.includes('}while(items.moveToNext());'),
+       'RoundSync needs empty-cursor fallback and must retain the first streamed row');
 assert(!libFile.includes('if(++total>=PAGE_SIZE)break;') ||
        main.includes('ReaderLibrary.stream(this,root,folder'),
        'Library still truncates folders at 500 files');
