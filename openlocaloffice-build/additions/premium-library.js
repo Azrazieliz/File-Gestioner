@@ -20,9 +20,9 @@ const collectionBtn=b('Collection','fg-lib-secondary',()=>bridge()?.pickLibraryF
 actions.append(openBtn,collectionBtn);header.append(brand,actions);
 const welcome=E('section','fg-lib-welcome');
 const kicker=E('p','fg-lib-kicker','OFFLINE READING');
-const hero=E('h1','fg-lib-hero','Your library, beautifully organized.');
+const hero=E('h1','fg-lib-hero','Your files. Your control.');
 const subtitle=E('p','fg-lib-subtitle',
-  'Illustrated books, webtoons, documents and 3D assets. Your files stay on your device.');
+  'Browse local and connected storage. Files remain on their original provider.');
 welcome.append(kicker,hero,subtitle);
 const toolbar=E('section','fg-lib-toolbar');
 const back=b('‹','fg-lib-nav-back',()=>navigateBack());
@@ -35,7 +35,9 @@ search.type='search';search.placeholder='Search your books';search.autocomplete=
 search.setAttribute('aria-label','Search your library');
 const layout=b('▦','fg-lib-icon',()=>{list=!list;layout.textContent=list?'☷':'▦';render();});
 layout.setAttribute('aria-label','Toggle grid and list');
-toolbar.append(back,headBox,search,layout);
+const sortButton=b('Name ↑','fg-lib-sort',()=>showSortMenu());
+sortButton.setAttribute('aria-label','Sort files');
+toolbar.append(back,headBox,search,sortButton,layout);
 const filters=E('div','fg-lib-filters');
 const deck=E('div','fg-lib-grid');
 const empty=E('div','fg-lib-empty');
@@ -51,7 +53,8 @@ const categories=[
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 let activeVersion=null,scanning=false,pageStart=0,renderTimer=0;
-let imagePumpVersion=0,imagePumpState=null;
+let imagePumpVersion=0,imagePumpState=null,listingRequest='',operationDialog=null;
+let sortBy='name',sortDescending=false;
 const PAGE=96;
 function classify(entry){
  if(entry.folder)return 'folder';
@@ -80,15 +83,8 @@ function tint(name){
 }
 function openBook(item){
  if(item.folder){
-   // An image folder IS a document view. Hide the library first or it
-   // remains above the reader even though all images load successfully.
-   activeUri=item.uri;
-   root.classList.add('fg-lib-hidden');
-   visible=false;
-   document.getElementById('home')?.classList.add('hidden');
-   document.getElementById('work')?.classList.remove('hidden');
-   bridge()?.openImageFolder?.(item.uri);
-   return;
+   // A folder is a folder. Image reading is a deliberate separate action.
+   enterFolder(item.id);return;
  }
  activeUri=item.uri;
  root.classList.add('fg-lib-hidden');
@@ -184,7 +180,13 @@ function render(){
      (!needle||e.title.toLocaleLowerCase().includes(needle));
  }).sort((a,b)=>{
    if(a.folder!==b.folder)return a.folder?-1:1;
-   return a.title.localeCompare(b.title,undefined,{numeric:true,sensitivity:'base'});
+   let difference=0;
+   if(sortBy==='size')difference=(a.size||0)-(b.size||0);
+   else if(sortBy==='modified')difference=(a.modified||0)-(b.modified||0);
+   else if(sortBy==='type')difference=classify(a).localeCompare(classify(b));
+   else difference=a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'});
+   return (sortDescending?-1:1)*(difference||
+      a.name.localeCompare(b.name,undefined,{numeric:true,sensitivity:'base'}));
  });
  const max=Math.max(0,shown.length-1);
  pageStart=Math.min(pageStart,Math.floor(max/PAGE)*PAGE);
@@ -222,7 +224,7 @@ function render(){
      deck.before(earlier);
    }
  }
- count.textContent=entries.length+(scanning?'+ scanned…':' items')+
+ count.textContent=entries.length+(scanning?' · scanning…':' files')+
    ' · showing '+(shown.length?String(pageStart+1):'0')+
    '–'+Math.min(shown.length,pageStart+PAGE);
  if(!shown.length){
@@ -243,6 +245,7 @@ function createFilters(){
 function request(){
  if(!bridge()?.getLibraryRoot?.()){showEmpty();return;}
  activeVersion=null;scanning=true;pageStart=0;entries=[];loaded=false;
+ listingRequest=currentFolder||'';
  loading.classList.remove('fg-lib-hidden');deck.classList.add('fg-lib-hidden');
  empty.classList.add('fg-lib-hidden');
  bridge()?.listLibrary?.(currentFolder);
@@ -282,10 +285,12 @@ function openSibling(direction){
  return true;
 }
 function navigateBack(){
+ closeFileActions();
  if(stack.length){currentFolder=stack.pop();request();return;}
  show();
 }
 function show(){
+ closeFileActions();
  imagePumpVersion++;imagePumpState=null;
  window.FileGestionerReading?.close?.();
  document.body.classList.remove('fg-folder-reading');
@@ -301,6 +306,7 @@ function show(){
 }
 function append(payload){
  if(!payload||!Array.isArray(payload.items))return;
+ if('requestedFolder' in payload && payload.requestedFolder!==listingRequest)return;
  if(activeVersion===null){
    activeVersion=payload.version;
    // SAF reports the resolved tree document ID, not the empty root alias.
@@ -373,7 +379,7 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,receive,append,error,handleBack:handleAndroidBack,enterFolder,openSibling,
+ show,receive,append,error,operationResult,handleBack:handleAndroidBack,enterFolder,openSibling,
  imageReaderReady:()=>{
    const state=imagePumpState;
    if(!state||state.started||state.version!==imagePumpVersion)return;
