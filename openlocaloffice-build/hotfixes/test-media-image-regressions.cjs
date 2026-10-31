@@ -55,8 +55,8 @@ assert(media.includes('if(video)leaveVideoFullscreen()'),'Video must restore nor
 const patchedFolder=fs.readFileSync('../hotfixes/apply-streamed-image-folders-20261031.py','utf8');
 assert(patchedFolder.includes('private void openImageInFolder(String folderId,String selectedUri)'),
   'Native image collection selection missing');
-assert(patchedFolder.includes('buildChildDocumentsUriUsingTree(\n                    libraryTree,folderId)'),
-  'Cloud image folder not queried with persisted SAF tree');
+assert(patchedFolder.includes('ReaderLibrary.stream(this,libraryTree,folderId'),
+  'Cloud image folder must share the adaptive SAF query and immediate streaming path');
 assert(patchedFolder.includes('@JavascriptInterface public void openImageInFolder'),
   'Image collection missing JavaScript bridge');
 assert(lib.includes('bridge().openImageInFolder(currentFolder,item.uri)'),
