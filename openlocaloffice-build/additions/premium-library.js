@@ -52,7 +52,7 @@ const categories=[
  ['document','Documents'],['model','3D assets']
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
-let activeVersion=null,scanning=false,pageStart=0,renderTimer=0;
+let activeVersion=null,scanning=false,pageStart=0,renderTimer=0,lastRender=0;
 let imagePumpVersion=0,imagePumpState=null,listingRequest='',operationDialog=null;
 let sortBy='name',sortDescending=false;
 const PAGE=96;
@@ -388,7 +388,8 @@ function createFilters(){
 function request(){
  if(!bridge()?.getLibraryRoot?.()){showEmpty();return;}
  activeVersion=null;scanning=true;pageStart=0;entries=[];loaded=false;
- listingRequest=currentFolder||'';
+ listingRequest=currentFolder||'';lastRender=0;
+ if(renderTimer){clearTimeout(renderTimer);renderTimer=0;}
  loading.classList.remove('fg-lib-hidden');deck.classList.add('fg-lib-hidden');
  empty.classList.add('fg-lib-hidden');
  bridge()?.listLibrary?.(currentFolder);
@@ -463,8 +464,15 @@ function append(payload){
  heading.textContent=stack.length?'Collection':'Your library';
  welcome.classList.add('fg-lib-hidden');toolbar.classList.remove('fg-lib-hidden');
  filters.classList.remove('fg-lib-hidden');
- if(renderTimer)clearTimeout(renderTimer);
- renderTimer=setTimeout(render,70);
+ // Do not debounce every 96-row batch: fast cloud streams would otherwise
+ // postpone the first visible page until the entire huge folder is scanned.
+ const elapsed=Date.now()-lastRender;
+ if(!lastRender||payload.finished||elapsed>=240){
+   if(renderTimer){clearTimeout(renderTimer);renderTimer=0;}
+   render();lastRender=Date.now();
+ }else if(!renderTimer){
+   renderTimer=setTimeout(()=>{renderTimer=0;render();lastRender=Date.now();},240-elapsed);
+ }
 }
 function receive(payload){
  loaded=true;
