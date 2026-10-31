@@ -23,7 +23,7 @@ public final class KoikatsuCards {
                 if(length>40L*1024*1024)return false;
                 skip(in,length+4);consumed+=12+length;
                 if(kind.equals("IEND")){
-                    byte[] trailer=new byte[128];int n=in.read(trailer);
+                    byte[] trailer=new byte[4096];int n=in.read(trailer);
                     if(n<=0)return false;
                     String fragment=new String(trailer,0,n,StandardCharsets.ISO_8859_1);
                     return fragment.contains("KoiKatuChara")||
