@@ -47,7 +47,7 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
         final long request=fgFolderVersion.incrementAndGet();
         final String token=java.util.UUID.randomUUID().toString();
         fgFolderToken=token;
-        // Selected file opens immediately even if remote listing takes time.
+        // Track the requested image and scroll to it as its page arrives.
         final Uri selected=selectedUri==null?null:Uri.parse(selectedUri);
         fgFolderPageMap.clear();
         fgDirectoryExecutor.execute(()->{
@@ -208,15 +208,12 @@ new=r'''                    if(assetPath!=null&&assetPath.startsWith("/folder-im
                     }
 '''
 s=s[:start]+new+s[end:]
-# Add a bridge method without breaking older openImageFolder callers.
-bridge='''        @JavascriptInterface public void openImageFolder(String uri){
-             MainActivity.this.openFolderImages(uri);
-        }
-'''
-assert s.count(bridge)==1
-s=s.replace(bridge,bridge+'''        @JavascriptInterface public void openImageInFolder(String folder,String selected){
+# The pre-existing bridge method is inserted by apply-reading-platform.
+anchor='''        @JavascriptInterface public void openKoikatsu3d(){'''
+assert s.count(anchor)==1, "3D bridge insertion point missing"
+s=s.replace(anchor,'''        @JavascriptInterface public void openImageInFolder(String folder,String selected){
             MainActivity.this.openImageInFolder(folder,selected);
         }
-''',1)
+'''+anchor,1)
 main.write_text(s)
 print("SAF image folders: Round Sync tree access, sequential navigation and resilient image streams")
