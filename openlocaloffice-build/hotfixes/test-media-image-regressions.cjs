@@ -35,11 +35,11 @@ assert(lower!==-1&&sniff!==-1&&lower<sniff,
 const libFile=fs.readFileSync('app/src/main/java/com/openlocal/office/core/ReaderLibrary.java','utf8');
 assert(libFile.includes('public static Listing stream('),'Incremental folder enumeration missing');
 assert(libFile.includes('if(batch.length()>=(firstBatch?1:48))') &&
-       libFile.includes('candidate.moveToFirst()') &&
-       libFile.includes('SAF_CHILDREN_EMPTY method=') &&
+       libFile.includes('DocumentsContract.EXTRA_LOADING') &&
+       libFile.includes('DocumentsContract.EXTRA_ERROR') &&
        libFile.includes('do{') &&
        libFile.includes('}while(items.moveToNext());'),
-       'RoundSync needs empty-cursor fallback and must retain the first streamed row');
+       'RoundSync must expose loading/errors and retain first streamed row');
 assert(!libFile.includes('if(++total>=PAGE_SIZE)break;') ||
        main.includes('ReaderLibrary.stream(this,root,folder'),
        'Library still truncates folders at 500 files');
@@ -140,4 +140,14 @@ assert(js.includes("setImageViewing?.(true)") && js.includes("fg-koikatsu-float"
 assert(style.includes("position:fixed!important;bottom:max(94px"),'Image controls remain behind Android system navigation');
 assert(main.includes("setImageImmersiveInternal") && main.includes("WindowInsets.Type.navigationBars()"),'Native immersive reader is missing');
 assert(libFile.includes("Storage provider omitted file ID or name"),'SAF error reporting is incomplete');
+const tb=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgTeraboxClient.java','utf8');
+assert(tb.includes('AES/GCM/NoPadding')&&tb.includes('AndroidKeyStore'), 'TeraBox ndus cannot be stored in plaintext');
+assert(tb.includes('listPage(')&&tb.includes('fileDetails(')&&tb.includes('save('),
+  'Native direct TeraBox cloud browsing and download are incomplete');
+assert(main.includes('listTeraboxNative(')&&main.includes('beginTbImages(')&&main.includes('fgTbImage('),
+  'Direct TeraBox browser is not connected to image reader');
+assert(lib.includes('getTeraboxConfigured?.()')&&lib.includes('appendTeraboxImageCollectionChunk'),
+  'Native cloud account selector or progressive image loading missing');
+assert(js.includes('verifyCurrentKoikatsuCard')&&js.includes("koikatsu.textContent='Open 3D'"),
+  'Native 3D card verification cannot be initiated from image reader');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
