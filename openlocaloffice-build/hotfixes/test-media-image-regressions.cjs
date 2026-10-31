@@ -11,8 +11,9 @@ assert(!lib.includes("if(item.folder){\n   bridge()?.openImageFolder"),'Folder o
 assert(lib.includes("root.classList.add('fg-lib-hidden');\n   visible=false;"),'Folder must hide library before loading');
 assert(js.includes("if(data?.type==='folderImages'||(data?.type==='image'"),'Dedicated image route absent');
 const block=js.slice(js.indexOf("window.loadDocument=function(data){"));
-assert(block.indexOf("renderImageFolder(data);")<block.indexOf("upstream.apply(this,arguments)"),
-  'Generic loader must not run before folder image reader');
+assert(block.includes("renderImageFolder(data.type==='image'?{") &&
+  block.indexOf("renderImageFolder(data.type==='image'?{")<block.indexOf("upstream.apply(this,arguments)"),
+  'Dedicated image reader must bypass generic document viewer');
 assert(js.includes('window.FileGestionerFolder='),'Dynamic image batches missing');
 assert(js.includes("stack.insertBefore(frag,sentinel)"),'On-screen pages not appended');
 assert(main.includes('fgFolderPageMap'),'Native folder images route missing');
