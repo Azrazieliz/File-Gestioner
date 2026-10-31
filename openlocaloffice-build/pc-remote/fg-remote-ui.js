@@ -4,7 +4,10 @@
 */
 (()=>{
 'use strict';
-const URL_ROOT='http://127.0.0.1:39273';
+// User-configured HTTPS tunnel is the normal remote transport.
+const defaultLocal='http://127.0.0.1:39273';
+const endpoint=()=>String(bridge()?.getRemoteEndpoint?.()||'').trim();
+const URL_ROOT=()=>endpoint()||defaultLocal;
 const bridge=()=>window.AndroidBridge||null;
 let overlay=null,status=null,viewport=null,frame=null,active=null,kind='cube',busy=false,scheduled=false;
 let yaw=.4,pitch=.2,distance=2.5,contacts=new Map(),lastSpan=0,serial=0,dead=false;
@@ -15,10 +18,31 @@ const el=(tag,cls,text)=>{
   return x;
 };
 const setStatus=t=>{if(status)status.textContent=t;};
+function showRemoteConfig(){
+ const wrapper=el('div','fg-pc-remote-config');
+ const text=el('input','fg-pc-remote-address');
+ text.type='url';text.inputMode='url';
+ text.placeholder='https://your-private-pc-tunnel.example';
+ text.value=endpoint();text.setAttribute('aria-label','Secure remote PC endpoint');
+ const save=el('button','fg-pc-action','Save remote address');
+ const result=el('div','fg-pc-config-status','');
+ save.onclick=()=>{
+   const value=text.value.trim().replace(/\\/+$/,'');
+   if(!/^https:\/\/[^\s/#?]+(?::\d+)?$/.test(value)){
+     result.textContent='Use an HTTPS address for the private PC relay.';return;
+   }
+   if(bridge()?.setRemoteEndpoint?.(value)){
+     result.textContent='Remote address saved for future sessions.';
+     wrapper.remove();
+   }else result.textContent='Remote address was rejected.';
+ };
+ wrapper.append(text,save,result);
+ return wrapper;
+}
 const token=()=>String(bridge()?.getRemoteToken?.()||'').trim();
 async function api(path,opts={}){
   const auth=token();if(!auth)throw Error('PC USB connection is not configured. Connect the paired PC.');
-  const resp=await fetch(URL_ROOT+path,{...opts,headers:{...(opts.headers||{}),'X-FG-Token':auth},cache:'no-store'});
+  const resp=await fetch(URL_ROOT()+path,{...opts,headers:{...(opts.headers||{}),'X-FG-Token':auth},cache:'no-store'});
   if(!resp.ok){
     let details='';try{details=(await resp.json()).error||''}catch(_){}
     throw Error(details||'PC bridge HTTP '+resp.status);
@@ -106,13 +130,20 @@ function open(nextKind='cube'){
   const connect=el('button','fg-pc-action','Reconnect');
   const connectNow=()=>{
     setStatus('Opening on connected PC…');
-    if(!token()){setStatus('PC link unavailable. Connect the authorized USB bridge.');return;}
+    if(!token()){setStatus('This installation needs the saved PC authorization.');return;}
+    if(!endpoint()){setStatus('Configure the secure remote PC address once in Remote settings.');return;}
     try{bridge()?.remoteOpen3D?.(kind);}catch(e){setStatus(String(e));}
   };
   connect.onclick=connectNow;
   const reset=el('button','fg-pc-action','Reset view');
   reset.onclick=()=>{yaw=.4;pitch=.2;distance=2.5;requestFrame();};
-  actions.append(connect,reset);overlay.append(actions);
+  const settings=el('button','fg-pc-action','Remote settings');
+  settings.onclick=()=>{
+    const existing=overlay.querySelector('.fg-pc-remote-config');
+    if(existing)existing.remove();
+    else overlay.insertBefore(showRemoteConfig(),status);
+  };
+  actions.append(connect,reset,settings);overlay.append(actions);
   let center=null;
   viewport.addEventListener('pointerdown',e=>{
     viewport.setPointerCapture(e.pointerId);
@@ -140,8 +171,8 @@ function open(nextKind='cube'){
   viewport.addEventListener('pointerup',end);viewport.addEventListener('pointercancel',end);
   document.body.append(overlay);
   // The normal path is automatic, no user Pair or Open action required.
-  if(token())setTimeout(connectNow,0);
-  else setStatus('PC not linked yet. Reconnect the authorized USB bridge.');
+  if(token()&&endpoint())setTimeout(connectNow,0);
+  else setStatus('Remote PC is not configured on this installation.');
 }
 window.FileGestionerRemoteViewer={open,onOpen,close};
 const entry=el('button','fg-pc-entry','PC 3D');
