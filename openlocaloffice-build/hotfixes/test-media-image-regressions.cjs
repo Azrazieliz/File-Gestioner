@@ -124,4 +124,7 @@ assert(remote.includes('getRemoteEndpoint?.()')&&
 assert(main.includes('setRemoteEndpoint(String value)')&&
   main.includes('remote.startsWith("https://")'),
   'Native PC transport is still hardcoded to ADB loopback');
+assert(lib.includes('function hideForReader(){') &&
+  lib.includes("if(document.body.classList.contains('fg-folder-reading'))hideForReader();"),
+  'External images are still hidden behind welcome library overlay');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
