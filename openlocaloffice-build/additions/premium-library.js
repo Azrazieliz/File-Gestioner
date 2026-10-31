@@ -43,7 +43,7 @@ const deck=E('div','fg-lib-grid');
 const empty=E('div','fg-lib-empty');
 const loading=E('div','fg-lib-loading','Loading your collection…');
 const footer=E('div','fg-lib-footer',
-  'PRIVATE · OFFLINE · ORIGINAL FILES UNCHANGED');
+  'YOUR FILES · LOCAL & CONNECTED STORAGE');
 body.append(welcome,toolbar,filters,loading,deck,empty,footer);
 root.append(header,body);
 document.body.insertBefore(root,document.getElementById('busy')||null);
@@ -126,9 +126,18 @@ function loadRemoteCover(image,url,cover){
    if(!image.isConnected||!visible){resolve();return;}
    const indicator=E('span','fg-lib-cover-loading','Loading cover…');
    cover.appendChild(indicator);
-   const finish=()=>{indicator.remove();resolve();};
-   image.addEventListener('load',finish,{once:true});
-   image.addEventListener('error',finish,{once:true});
+   let done=false,timeout=0;
+   const finish=()=>{
+     if(done)return;done=true;clearTimeout(timeout);
+     image.removeEventListener('load',finish);
+     image.removeEventListener('error',finish);
+     indicator.remove();resolve();
+   };
+   image.addEventListener('load',finish);
+   image.addEventListener('error',finish);
+   // Cloud providers may leave an image request hanging indefinitely.
+   // Never allow a single remote cover to block the entire cover queue.
+   timeout=setTimeout(finish,12000);
    image.src=url;
  }));
 }
