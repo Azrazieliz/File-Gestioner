@@ -9,7 +9,7 @@ const media=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgMedia
 const growing=fs.readFileSync('app/src/main/java/com/openlocal/office/core/FgGrowingMediaDataSource.java','utf8');
 assert(!lib.includes("if(item.folder){\n   bridge()?.openImageFolder"),'Folder overlay is still blocking image pages');
 assert(lib.includes("enterFolder(item.id);return;"),'Folders must browse normally rather than force image reading');
-assert(js.includes("if(data?.type==='folderImages'||(data?.type==='image'"),'Dedicated image route absent');
+assert(js.includes("if(data?.type==='folderImages'||data?.type==='image')"),'Dedicated image route absent');
 const block=js.slice(js.indexOf("window.loadDocument=function(data){"));
 assert(block.includes("renderImageFolder(data.type==='image'?{") &&
   block.indexOf("renderImageFolder(data.type==='image'?{")<block.indexOf("upstream.apply(this,arguments)"),
@@ -112,4 +112,16 @@ assert(remote.includes('if(data.error&&!data.session)'),
   'Async Koikatsu pending sessions still terminate before rendering');
 assert(remote.includes("frame.hidden=true"),
   'PC viewer still shows broken-image icon instead of loading state');
+const fallbackSource=fs.readFileSync('../hotfixes/apply-image-fallback-20261031.py','utf8');
+assert(js.includes("IMAGE_NATIVE_FALLBACK_REQUESTED")&&
+  fallbackSource.includes("fgFallbackBitmap("),
+  'Broken PNG image native fallback is missing');
+assert(main.includes('verifyKoikatsuInBackground('),
+  'Koikatsu card validation blocks PNG opening');
+assert(remote.includes('getRemoteEndpoint?.()')&&
+  remote.includes('showRemoteConfig()'),
+  'PC remote endpoint settings missing');
+assert(main.includes('setRemoteEndpoint(String value)')&&
+  main.includes('remote.startsWith("https://")'),
+  'Native PC transport is still hardcoded to ADB loopback');
 console.log('PASS: image folder visible, streamed pages, direct MP4 and growing cache byte reads.');
