@@ -113,8 +113,8 @@ body.fg-folder-reading #editor{height:100dvh!important;min-height:0!important;
  height:auto!important;max-height:none!important;max-width:none!important;
  margin:0!important;padding:0!important;object-fit:contain!important}
 .fg-image-reader .fg-image-paged{scroll-snap-type:y mandatory!important}
-.fg-image-reader .fg-image-paged .fg-folder-page{height:100%!important;
- min-height:100%!important;flex:0 0 100%!important;scroll-snap-align:start;
+.fg-image-reader .fg-image-paged .fg-folder-page{height:100dvh!important;
+ min-height:100dvh!important;flex:0 0 100dvh!important;scroll-snap-align:start;
  display:flex!important;align-items:center!important;justify-content:center!important;
  overflow:hidden!important}
 .fg-image-reader .fg-image-paged .fg-folder-image{width:auto!important;
