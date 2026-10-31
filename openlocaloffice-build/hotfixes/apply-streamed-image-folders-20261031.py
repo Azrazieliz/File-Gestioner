@@ -162,57 +162,31 @@ replacement=r'''    private final java.util.concurrent.ConcurrentHashMap<Integer
             };
             try{
                 final String folderId=android.provider.DocumentsContract.getDocumentId(directory);
-                // Build children through the actual persisted tree grant, not
-                // a child URI that some cloud providers cannot authorize.
-                Uri children=android.provider.DocumentsContract.buildChildDocumentsUriUsingTree(
-                    libraryTree,folderId);
-                String[] cols={
-                    android.provider.DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                    android.provider.DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                    android.provider.DocumentsContract.Document.COLUMN_MIME_TYPE};
-                // A cloud SAF provider can take time to enumerate 40k files.
-                // Emit the first 64 rows immediately; do not wait for the end.
-                java.util.List<FolderPage> batch=new java.util.ArrayList<>(64);
-                long startMillis=android.os.SystemClock.elapsedRealtime();
-                android.database.Cursor result=null;
-                try{
-                    try{
-                        result=getContentResolver().query(children,cols,null,null,null);
-                    }catch(Exception treeError){
-                        android.util.Log.w("FG_FOLDER","Cloud tree query failed; trying document URI",treeError);
-                    }
-                    if(result==null){
-                        Uri fallback=android.provider.DocumentsContract.buildChildDocumentsUri(
-                            directory.getAuthority(),folderId);
-                        result=getContentResolver().query(fallback,cols,null,null,null);
-                    }
-                    if(result==null)throw new java.io.IOException("Folder provider did not return images");
-                    try(android.database.Cursor cursor=result){
-                    while(cursor.moveToNext()){
-                        if(request!=fgFolderVersion.get())return;
-                        String id=cursor.getString(0),name=cursor.getString(1),
-                            mime=cursor.getString(2);
-                        if(id==null||name==null||name.startsWith("."))continue;
+                final long startMillis=android.os.SystemClock.elapsedRealtime();
+                // Reuse the same adaptive SAF listing strategy as the library.
+                // Round Sync may refuse tree-scoped queries or optional columns.
+                final java.util.List<FolderPage> batch=new java.util.ArrayList<>(48);
+                ReaderLibrary.stream(this,libraryTree,folderId,(foundFolder,items,done)->{
+                    if(request!=fgFolderVersion.get())
+                        throw new java.util.concurrent.CancellationException();
+                    for(int at=0;at<items.length();at++){
+                        org.json.JSONObject file=items.getJSONObject(at);
+                        if(file.optBoolean("folder"))continue;
+                        String name=file.optString("name","");
                         String lower=name.toLowerCase(java.util.Locale.ROOT);
-                        if(!(lower.endsWith(".png")||lower.endsWith(".jpg")||
+                        if(name.startsWith(".")||
+                           !(lower.endsWith(".png")||lower.endsWith(".jpg")||
                              lower.endsWith(".jpeg")||lower.endsWith(".webp")||
-                             lower.endsWith(".gif")||lower.endsWith(".avif")))continue;
-                        if(android.provider.DocumentsContract.Document.MIME_TYPE_DIR
-                            .equals(mime))continue;
-                        Uri file=android.provider.DocumentsContract.buildDocumentUriUsingTree(
-                            libraryTree,id);
-                        batch.add(new FolderPage(file,name));
-                        if(batch.size()>=(started.get()?64:2)){
+                             lower.endsWith(".gif")||lower.endsWith(".avif")||
+                             lower.endsWith(".bmp")))continue;
+                        batch.add(new FolderPage(Uri.parse(file.getString("uri")),name));
+                        if(batch.size()>=(started.get()?48:1)){
                             flush.accept(batch);
-                            batch=new java.util.ArrayList<>(64);
+                            batch.clear();
                         }
                     }
-                    }
-                }catch(SecurityException permission){
-                    throw new java.io.IOException("Round Sync folder permission denied: "+
-                        permission.getMessage(),permission);
-                }
-                flush.accept(batch);
+                    if(done)flush.accept(batch);
+                });
                 if(!started.get()){
                     runOnUiThread(()->{
                         if(request==fgFolderVersion.get())
