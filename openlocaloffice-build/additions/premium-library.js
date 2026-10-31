@@ -48,8 +48,9 @@ body.append(welcome,toolbar,filters,loading,deck,empty,footer);
 root.append(header,body);
 document.body.insertBefore(root,document.getElementById('busy')||null);
 const categories=[
- ['all','All'],['image','Images'],['comic','Comics'],['book','Books'],
- ['document','Documents'],['model','3D assets']
+ ['all','All files'],['image','Images'],['video','Video'],['audio','Audio'],
+ ['book','Books'],['comic','Comics'],['archive','Archives'],['pdf','PDF'],
+ ['document','Documents'],['model','3D assets'],['file','Other']
 ];
 let entries=[],list=false,currentFolder='',stack=[],filter='all',phrase='',loaded=false,visible=false,activeUri='';
 let activeVersion=null,scanning=false,pageStart=0,renderTimer=0,lastRender=0;
@@ -59,11 +60,16 @@ const PAGE=96;
 function classify(entry){
  if(entry.folder)return 'folder';
  const x=entry.name.toLowerCase();
- if(/\.(cbz|zip|cbr)$/.test(x))return 'comic';
+ if(/\.(cbz|cbr)$/.test(x))return 'comic';
+ if(/\.(zip|7z|rar|tar|gz)$/.test(x))return 'archive';
  if(/\.(epub)$/.test(x))return 'book';
+ if(/\.(pdf)$/.test(x))return 'pdf';
  if(/\.(png|jpe?g|webp|avif|gif|bmp)$/.test(x))return 'image';
+ if(/\.(mp4|webm|mkv|mov|avi)$/.test(x))return 'video';
+ if(/\.(mp3|m4a|flac|wav|ogg|opus)$/.test(x))return 'audio';
  if(/\.(glb|gltf|fbx|obj|vrm|blend|pmx|pmd)$/.test(x))return 'model';
- return 'document';
+ if(/\.(docx?|xlsx?|csv|txt|md|rtf|odt|ods|sdocx|pptx?)$/.test(x))return 'document';
+ return 'file';
 }
 function formatSize(n){
  if(n==null||n<0)return '';
@@ -73,10 +79,12 @@ function formatSize(n){
 }
 function label(e){
  const c=classify(e);
- return {comic:'COMIC',image:'IMAGE',book:'EBOOK',document:'DOCUMENT',model:'3D ASSET',
-   folder:'COLLECTION'}[c];
+ return {comic:'COMIC',archive:'ARCHIVE',image:'IMAGE',video:'VIDEO',
+   audio:'AUDIO',pdf:'PDF',book:'EBOOK',document:'DOCUMENT',
+   model:'3D ASSET',file:'FILE',folder:'FOLDER'}[c];
 }
-function icon(c){return {comic:'▧',image:'▧',book:'▤',document:'▤',model:'◇',folder:'▣'}[c];}
+function icon(c){return {comic:'▧',archive:'▦',image:'▧',video:'▶',audio:'♫',
+ pdf:'▤',book:'▤',document:'▤',model:'◇',file:'□',folder:'▣'}[c];}
 function tint(name){
  let h=42;for(const ch of name)h=(h*33+ch.charCodeAt(0))>>>0;
  return (h%260)+30;
@@ -195,9 +203,10 @@ function showFileActions(item){
    (formatSize(item.size)?' · '+formatSize(item.size):''));
  const openLabel=item.folder?'Browse folder':
     kind==='image'?'Read image collection':kind==='comic'?'Read comic archive':
+    kind==='archive'?'Open archive':kind==='pdf'?'Read PDF':
+    kind==='video'?'Play video fullscreen':kind==='audio'?'Play audio':
     kind==='book'?'Read ebook':kind==='model'?'Open 3D asset':
-    isMedia?'Play media':/\.(csv|xlsx|xls)$/i.test(item.name)?'Edit spreadsheet':
-    'Open file';
+    /\.(csv|xlsx|xls)$/i.test(item.name)?'Edit spreadsheet':'Open file';
  fileAction(sheet,openLabel,'Use the matching file viewer',()=>{
    closeFileActions();openBook(item);
  });
