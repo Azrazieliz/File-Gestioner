@@ -112,6 +112,9 @@ function zoomImage(url){
 }
 function closeImage(){lightbox?.remove();lightbox=null;}
 function remove(){
+ window.AndroidBridge?.setImageViewing?.(false);
+ document.body.classList.remove('fg-image-reader-active');
+ document.body.classList.remove('fg-folder-reading');
  closeSettings();closeImage();
  if(scroller&&listener)scroller.removeEventListener('scroll',listener);
  scroller=null;listener=null;controls?.remove();controls=null;
@@ -170,6 +173,8 @@ function renderImageFolder(data){
  editor.classList.remove('hidden');editor.removeAttribute('hidden');
  document.body.classList.add('fg-folder-reading');
  const host=el('div','fg-folder-reader fg-image-reader');
+ document.body.classList.add('fg-image-reader-active');
+ window.AndroidBridge?.setImageViewing?.(true);
  const view=el('div','fg-folder-scroll');
  view.setAttribute('role','document');
  view.setAttribute('aria-label','Image collection');
@@ -185,18 +190,19 @@ function renderImageFolder(data){
  const modeButton=btn('Pages','Switch to page-by-page images',()=>switchMode());
  const position=el('span','fg-image-position','0 / …');
  const collapse=btn('⌄','Toggle image controls',()=>bar.classList.toggle('fg-image-toolbar-small'));
- const koikatsu=btn('3D','Open genuine Koikatsu card with the connected PC',
+ const koikatsu=btn('Open 3D','Open verified Koikatsu card with remote PC',
    ()=>window.FileGestionerRemoteViewer?.open('koikatsu'));
- koikatsu.classList.add('fg-image-koikatsu');
+ koikatsu.classList.add('fg-image-koikatsu fg-koikatsu-float');
  koikatsu.hidden=!Boolean(data.koikatsuCard);
- bar.append(close,previous,position,next,modeButton,koikatsu,collapse);
- host.append(view,bar);editor.replaceChildren(host);
+ bar.append(close,previous,position,next,modeButton,collapse);
+ host.append(view,bar,koikatsu);editor.replaceChildren(host);
  for(const id of ['sheetBar','spreadsheetTools','textFormat','notice'])
    by('#'+id)?.classList.add('hidden');
  let imageObserver=null,batchObserver=null,index=0,current=0,finished=false,busy=false;
  function closeCollection(){
    // ACTION_VIEW from Files/RoundSync should return to that app instead
    // of showing an empty File Gestioner library.
+   window.AndroidBridge?.setImageViewing?.(false);
    if(window.AndroidBridge?.returnToExternalFile?.())return;
    window.FileGestionerLibrary?.show?.();
  }
@@ -385,7 +391,7 @@ function renderImageFolder(data){
    select:i=>{selectedIndex=i;jumpTo(i);},
    koikatsuCard:valid=>{
      koikatsu.hidden=!valid;
-     if(valid)koikatsu.title='Open verified native Koikatsu character on PC';
+     if(valid)koikatsu.title='Open verified Koikatsu character remotely in 3D';
    }
  };
  view.classList.toggle('fg-image-paged',imageMode==='pages');
