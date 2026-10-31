@@ -24,6 +24,14 @@ s+="""
    expand.textContent=document.body.classList.contains('fg-sheet-tools-open')?'Less':'Tools';
  });
  expand.id='fgSheetToggle';tools.insertBefore(expand,actions);
+ const back=make('‹',()=>{
+   document.activeElement?.blur?.();
+   window.FileGestionerLibrary?.show?.();
+ });
+ back.id='fgSheetBack';
+ back.title='Back to library';
+ back.setAttribute('aria-label','Back to library');
+ tools.insertBefore(back,tools.firstChild);
  const save=make('Save',()=>{
    document.activeElement?.blur?.();
    document.getElementById('saveBtn')?.click();
@@ -45,6 +53,25 @@ s+="""
 js.write_text(s)
 css=Path("app/src/main/assets/style.css")
 css.write_text(css.read_text()+"""
+/* A spreadsheet has its own Back, formula and Save controls.
+   Hide the redundant general-purpose bar, which otherwise sits behind the
+   Android status icons on edge-to-edge Samsung devices. */
+body.fg-spreadsheet-reading>.bar{display:none!important}
+body.fg-spreadsheet-reading #work{height:100dvh!important;max-height:100dvh!important;
+ padding-top:max(33px,env(safe-area-inset-top,0px))!important;
+ padding-bottom:env(safe-area-inset-bottom,0px)!important}
+body.fg-spreadsheet-reading #spreadsheetTools{
+ grid-template-columns:35px 52px minmax(0,1fr) 55px!important}
+body.fg-spreadsheet-reading #fgSheetBack{grid-column:1;grid-row:1;
+ border:1px solid #526685;background:#263c5c;color:#eff5ff;
+ border-radius:10px;min-height:34px;min-width:34px;padding:0 6px!important;
+ font:700 25px/1 system-ui}
+body.fg-spreadsheet-reading #selectedCellRef{grid-column:2;grid-row:1}
+body.fg-spreadsheet-reading #spreadsheetTools .formulaBox{grid-column:3;grid-row:1}
+body.fg-spreadsheet-reading #fgSheetToggle{grid-column:4;grid-row:1}
+body.fg-spreadsheet-reading .sheetQuickActions{grid-row:2}
+@media(max-width:550px){body.fg-spreadsheet-reading #spreadsheetTools{
+ grid-template-columns:34px 50px minmax(0,1fr) 55px!important}}
 /* File-specific spreadsheet canvas: no bottom black overlay. */
 body.fg-spreadsheet-reading{overflow:hidden!important}
 body.fg-spreadsheet-reading .bar{padding-top:max(28px,env(safe-area-inset-top,0px))!important;
