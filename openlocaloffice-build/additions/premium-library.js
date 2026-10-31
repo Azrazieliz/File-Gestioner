@@ -245,6 +245,14 @@ function showFileActions(item){
    fileAction(sheet,'Share original file','Share through the Android share sheet',()=>{
      closeFileActions();bridge()?.shareLibraryFile?.(item.uri);
    });
+   fileAction(sheet,'Copy to folder','Stream to local or cloud storage, keeping the original',()=>{
+     closeFileActions();bridge()?.copyLibraryFile?.(item.uri);
+     showTransferSheet('Copying file');
+   });
+   fileAction(sheet,'Move to folder','Delete the original only after the destination is verified',()=>{
+     closeFileActions();bridge()?.moveLibraryFile?.(item.uri);
+     showTransferSheet('Moving file');
+   },{disabled:!write});
  }
  fileAction(sheet,'Properties','Size, type, date and storage provider',()=>fileProperties(item));
  if(!item.folder){
@@ -272,13 +280,36 @@ function showFileActions(item){
      'Rename and delete require write permission from this storage provider. Re-select the collection to request write access.'));
  }
 }
+function showTransferSheet(title){
+ const sheet=fileSheet(title,'Choose the destination in the Android folder picker.');
+ const note=E('p','fg-transfer-note','After selecting a folder, the transfer will stream without loading the whole file into memory.');
+ note.setAttribute('role','status');sheet.append(note);
+ const progress=E('progress','fg-transfer-progress');progress.max=100;progress.value=0;
+ sheet.append(progress);
+ fileAction(sheet,'Cancel transfer','Safely stop copying; the original stays intact',()=>{
+   bridge()?.cancelLibraryTransfer?.();closeFileActions();
+ });
+}
+function transferProgress(progress){
+ if(!operationDialog||!progress)return;
+ const bar=operationDialog.querySelector('.fg-transfer-progress');
+ const note=operationDialog.querySelector('.fg-transfer-note');
+ if(!bar||!note)return;
+ const transferred=Number(progress.transferred)||0,total=Number(progress.total)||0;
+ if(total>0){
+   bar.value=Math.min(100,Math.round(transferred/total*100));
+   note.textContent='Copied '+formatSize(transferred)+' of '+formatSize(total)+
+     ' ('+bar.value+'%)';
+ }else if(transferred>0)note.textContent='Copied '+formatSize(transferred)+'…';
+}
 function operationResult(result){
  if(!result)return;
  const toast=E('div','fg-file-toast',
    (result.ok?'':'Action failed: ')+(result.detail||result.operation));
  toast.setAttribute('role','status');document.body.append(toast);
  setTimeout(()=>toast.remove(),4500);
- if(result.ok&&(result.operation==='rename'||result.operation==='delete'))request();
+ if(result.ok&&['rename','delete','move','copy'].includes(result.operation))request();
+ if(['move','copy','transfer'].includes(result.operation))closeFileActions();
 }
 
 function card(item,i){
@@ -553,7 +584,7 @@ function handleAndroidBack(){
  return true;
 }
 window.FileGestionerLibrary={
- show,receive,append,error,operationResult,handleBack:handleAndroidBack,enterFolder,openSibling,
+ show,receive,append,error,operationResult,transferProgress,handleBack:handleAndroidBack,enterFolder,openSibling,
  imageReaderReady:()=>{
    const state=imagePumpState;
    if(!state||state.started||state.version!==imagePumpVersion)return;
