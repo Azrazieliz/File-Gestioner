@@ -77,17 +77,18 @@ body.fg-spreadsheet-reading{overflow:hidden!important}
 body.fg-spreadsheet-reading .bar{padding-top:max(28px,env(safe-area-inset-top,0px))!important;
  min-height:80px!important}
 body.fg-spreadsheet-reading #work{display:flex!important;flex-direction:column!important;
- height:calc(100dvh - 84px)!important;min-height:0!important;
+ height:100dvh!important;max-height:100dvh!important;min-height:0!important;
+ padding-top:max(33px,env(safe-area-inset-top,0px))!important;
  overflow:hidden!important;padding-bottom:env(safe-area-inset-bottom,0px)!important}
 body.fg-spreadsheet-reading #sheetBar{flex:0 0 auto!important;overflow-x:auto!important;
  max-height:100px;padding:5px!important}
 body.fg-spreadsheet-reading #spreadsheetTools{display:grid!important;flex:0 0 auto!important;
- grid-template-columns:55px minmax(0,1fr) 55px!important;gap:4px!important;
+ grid-template-columns:35px 52px minmax(0,1fr) 55px!important;gap:4px!important;
  padding:5px!important;background:var(--surface)!important;min-height:44px!important}
-body.fg-spreadsheet-reading #selectedCellRef{grid-column:1}
-body.fg-spreadsheet-reading #spreadsheetTools .formulaBox{grid-column:2;min-width:0!important}
+body.fg-spreadsheet-reading #selectedCellRef{grid-column:2;grid-row:1}
+body.fg-spreadsheet-reading #spreadsheetTools .formulaBox{grid-column:3;grid-row:1;min-width:0!important}
 body.fg-spreadsheet-reading #formulaInput{font-size:16px!important}
-body.fg-spreadsheet-reading #fgSheetToggle{grid-column:3;min-height:35px;padding:5px!important;
+body.fg-spreadsheet-reading #fgSheetToggle{grid-column:4;grid-row:1;min-height:35px;padding:5px!important;
  border:1px solid #4e6182;background:#314664;color:#fff;border-radius:9px;font:650 12px system-ui}
 body.fg-spreadsheet-reading .sheetQuickActions{display:none!important;grid-column:1/-1!important;
  overflow-x:auto!important;white-space:nowrap;gap:4px!important}
