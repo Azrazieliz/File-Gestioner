@@ -125,6 +125,7 @@ jobs:
           python3 ../hotfixes/apply-library-transfer-20261031.py
           python3 ../hotfixes/apply-spreadsheet-mobile-20261031.py
           python3 ../hotfixes/apply-file-conversion-20261031.py
+          python3 ../hotfixes/apply-release-version-20261031.py
           cp ../additions/FgMediaPlayer.java app/src/main/java/com/openlocal/office/core/FgMediaPlayer.java
           cp ../additions/FgGrowingMediaDataSource.java app/src/main/java/com/openlocal/office/core/FgGrowingMediaDataSource.java
           python3 -m py_compile ../hotfixes/apply-scale-library-20261031.py ../hotfixes/apply-scale-media-20261031.py ../hotfixes/apply-streamed-image-folders-20261031.py ../hotfixes/apply-file-conversion-20261031.py
