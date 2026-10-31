@@ -175,9 +175,13 @@ assert s.count(anchor)==1,"File detection anchor changed"
 s=s.replace(anchor,'''
                 String lowerMediaName=name.toLowerCase(java.util.Locale.ROOT);
                 if(lowerMediaName.endsWith(".mp3")||lowerMediaName.endsWith(".mp4")||
-                   lowerMediaName.endsWith(".m4a")||lowerMediaName.endsWith(".webm")){
+                   lowerMediaName.endsWith(".m4a")||lowerMediaName.endsWith(".webm")||
+                   lowerMediaName.endsWith(".mkv")||lowerMediaName.endsWith(".mov")||
+                   lowerMediaName.endsWith(".flac")||lowerMediaName.endsWith(".wav")||
+                   lowerMediaName.endsWith(".ogg")||lowerMediaName.endsWith(".opus")){
                     final boolean isVideo=lowerMediaName.endsWith(".mp4")||
-                        lowerMediaName.endsWith(".webm");
+                        lowerMediaName.endsWith(".webm")||lowerMediaName.endsWith(".mkv")||
+                        lowerMediaName.endsWith(".mov");
                     runOnUiThread(()->showFgMedia(uri,name,isVideo));
                     return;
                 }
