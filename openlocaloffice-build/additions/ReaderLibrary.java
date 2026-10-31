@@ -38,6 +38,7 @@ public final class ReaderLibrary {
             DocumentsContract.Document.COLUMN_SIZE,
             DocumentsContract.Document.COLUMN_LAST_MODIFIED};
         JSONArray batch=new JSONArray();
+        boolean firstBatch=true;
         try(Cursor cursor=ctx.getContentResolver().query(children,cols,null,null,null)){
             if(cursor==null)throw new java.io.IOException("Folder provider returned no cursor");
             while(cursor.moveToNext()){
@@ -53,8 +54,9 @@ public final class ReaderLibrary {
                     .put("modified",cursor.isNull(4)?0L:cursor.getLong(4))
                     .put("uri",DocumentsContract.buildDocumentUriUsingTree(tree,did).toString());
                 batch.put(item);
-                if(batch.length()>=96){
+                if(batch.length()>=(firstBatch?12:96)){
                     sink.accept(id,batch,false);
+                    firstBatch=false;
                     batch=new JSONArray();
                 }
             }
