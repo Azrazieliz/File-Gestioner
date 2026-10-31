@@ -168,6 +168,7 @@ public final class FgTeraboxClient {
         HttpURLConnection stream=(HttpURLConnection)new URL(link).openConnection();
         stream.setConnectTimeout(12000);stream.setReadTimeout(50000);
         stream.setRequestProperty("User-Agent","Mozilla/5.0 (Linux; Android) AppleWebKit/537.36");
+        stream.setRequestProperty("Referer","https://www.terabox.com/");
         String host=stream.getURL().getHost().toLowerCase(Locale.ROOT);
         if(host.equals("terabox.com")||host.endsWith(".terabox.com")||
            host.equals("dubox.com")||host.endsWith(".dubox.com")){
