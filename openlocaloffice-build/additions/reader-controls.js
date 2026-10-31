@@ -242,6 +242,18 @@ function renderImageFolder(data){
      });
      image.addEventListener('error',()=>{
        if(!section.isConnected||image.dataset.recycled==='yes')return;
+       if(image.dataset.fallbackAttempted!=='yes'){
+         image.dataset.fallbackAttempted='yes';
+         const nativeUrl=page.url.startsWith('https://fg-assets.invalid/raw/')?
+           page.url.replace('/raw/','/fallback/'):
+           page.url.startsWith('https://fg-assets.invalid/folder-img/')?
+           page.url.replace('/folder-img/','/fallback-folder/'):null;
+         if(nativeUrl){
+           image.src=nativeUrl;
+           window.AndroidBridge?.readerDiagnostic?.('IMAGE_NATIVE_FALLBACK_REQUESTED');
+           return;
+         }
+       }
        let retry=section.querySelector('.fg-image-retry');
        if(retry)return;
        retry=btn('Retry image','Reload this image from storage',()=>{
