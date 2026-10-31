@@ -67,6 +67,12 @@ assert(js.includes('fg-image-toolbar')&&!js.includes('requestAnimationFrame(()=>
 assert(js.includes('imageMode=data.standalone'), 'Single-image smart-fit mode missing');
 assert(style.includes('.fg-image-reader .fg-image-paged .fg-image-rotated .fg-folder-image'),
   'Landscape pictures still cannot use portrait screen efficiently');
+assert(lib.includes('function showFileActions(item)')&&
+       lib.includes('function fileSheet(title,note)')&&
+       lib.includes('function fileAction(sheet,label,description,callback')&&
+       lib.includes('function showSortMenu()')&&
+       lib.includes('function operationResult(result)'),
+       'Contextual file handlers are referenced but not defined');
 assert(lib.includes('showFileActions(item)'), 'File-specific action sheet missing');
 assert(lib.includes('sortDescending'), 'Sort order selection missing');
 assert(lib.includes('closeFileActions'), 'Contextual file controls cannot close');
