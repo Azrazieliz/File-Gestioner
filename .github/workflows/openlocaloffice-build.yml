@@ -120,6 +120,7 @@ jobs:
           python3 ../hotfixes/apply-scale-media-20261031.py
           python3 ../hotfixes/apply-streamed-image-folders-20261031.py
           python3 ../hotfixes/apply-image-fallback-20261031.py
+          python3 ../hotfixes/apply-image-immersive-20261031.py
           python3 ../hotfixes/apply-native-file-actions-20261031.py
           python3 ../hotfixes/apply-library-transfer-20261031.py
           python3 ../hotfixes/apply-spreadsheet-mobile-20261031.py
@@ -132,6 +133,7 @@ jobs:
           grep -Fq 'FgMediaPlayer' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'fgFolderPageMap' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'fgFallbackBitmap' app/src/main/java/com/openlocal/office/MainActivity.java
+          grep -Fq 'setImageImmersiveInternal' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'getRemoteEndpoint' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'canManageLibraryFiles' app/src/main/java/com/openlocal/office/MainActivity.java
           grep -Fq 'copyLibraryFile' app/src/main/java/com/openlocal/office/MainActivity.java
