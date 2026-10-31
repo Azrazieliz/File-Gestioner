@@ -174,7 +174,7 @@ once('''                    imageStreamToken=java.util.UUID.randomUUID().toStrin
                     remember(uri,name,currentMime);
                     String url="https://fg-assets.invalid/raw/"+imageStreamToken+"/image";
                     String payload="{\\"type\\":\\"image\\",\\"name\\":"+q(name)+''','''                    imageStreamToken=java.util.UUID.randomUUID().toString();
-                    boolean character="png".equals(quickType)&&KoikatsuCards.isCharacterCard(this,uri);
+                    boolean character=false; // Nonblocking: show image before validating Koikatsu payload
                     remember(uri,name,currentMime);
                     String url="https://fg-assets.invalid/raw/"+imageStreamToken+"/image";
                     String payload="{\\"type\\":\\"image\\",\\"name\\":"+q(name)+
