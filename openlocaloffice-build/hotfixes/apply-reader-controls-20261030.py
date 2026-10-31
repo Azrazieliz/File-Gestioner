@@ -91,5 +91,57 @@ style+="""
  padding:12px 4px;color:#aebed8;background:#111722;
  font:12px system-ui;min-height:32px;line-height:1.3}
 """
+style+="""
+
+/* Separate image-reading surface: no EPUB dock, no section bars or wasted
+   document canvas. Continuous mode is edge-to-edge and naturally sized. */
+body.fg-folder-reading{margin:0!important;overflow:hidden!important;background:#000!important}
+body.fg-folder-reading #work{height:100dvh!important;padding:0!important;margin:0!important}
+body.fg-folder-reading #editor{height:100dvh!important;min-height:0!important;
+ overflow:hidden!important;padding:0!important;max-width:none!important}
+.fg-image-reader{position:relative!important;width:100%!important;
+ height:100dvh!important;overflow:hidden!important;background:#000}
+.fg-image-reader .fg-folder-scroll{width:100%!important;height:100%!important;
+ overflow:auto!important;scroll-behavior:auto!important;padding:0!important;
+ background:#000;overscroll-behavior:contain}
+.fg-image-reader .fg-folder-stack{width:100%!important;display:flex!important;
+ flex-direction:column!important;gap:0!important;margin:0!important;padding:0!important}
+.fg-image-reader .fg-folder-page{position:relative!important;width:100%!important;
+ display:block;margin:0!important;padding:0!important;border:0!important;
+ background:#000;line-height:0!important}
+.fg-image-reader .fg-folder-image{display:block!important;width:100%!important;
+ height:auto!important;max-height:none!important;max-width:none!important;
+ margin:0!important;padding:0!important;object-fit:contain!important}
+.fg-image-reader .fg-image-paged{scroll-snap-type:y mandatory!important}
+.fg-image-reader .fg-image-paged .fg-folder-page{height:100%!important;
+ min-height:100%!important;flex:0 0 100%!important;scroll-snap-align:start;
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ overflow:hidden!important}
+.fg-image-reader .fg-image-paged .fg-folder-image{width:auto!important;
+ height:auto!important;max-width:100%!important;max-height:100%!important;
+ margin:auto!important;object-fit:contain!important}
+.fg-image-reader .fg-image-paged .fg-image-rotated .fg-folder-image{
+ position:absolute!important;left:50%;top:50%;margin:0!important;
+ width:100dvh!important;height:100vw!important;max-width:none!important;
+ max-height:none!important;transform:translate(-50%,-50%) rotate(90deg)!important;
+ object-fit:contain!important}
+.fg-image-toolbar{position:absolute;z-index:9990;bottom:max(4px,env(safe-area-inset-bottom,0px));
+ left:50%;transform:translateX(-50%);width:min(98%,480px);
+ display:flex;gap:4px;align-items:center;padding:5px 7px;border-radius:11px;
+ background:#0b1029d9;border:1px solid #59668388;color:#fff;
+ box-sizing:border-box;font:500 13px system-ui;backdrop-filter:blur(14px)}
+.fg-image-toolbar .fg-control-button{flex:0 1 auto;min-width:36px;min-height:36px;
+ border:0;background:#273650b0;color:white;padding:6px 9px}
+.fg-image-toolbar .fg-image-position{flex:1;text-align:center;
+ white-space:nowrap;font:600 12px system-ui}
+.fg-image-toolbar-small{opacity:.12;transform:translateX(-50%) translateY(80%);transition:opacity .15s}
+.fg-image-toolbar-small:active,.fg-image-toolbar-small:focus-within{opacity:1;
+ transform:translateX(-50%)}
+.fg-image-reader .fg-image-retry{position:absolute;top:50%;left:50%;
+ transform:translate(-50%,-50%);z-index:3;white-space:nowrap}
+.fg-image-reader .fg-image-error{padding:14px!important;background:#411c2b!important}
+.fg-image-reader .fg-folder-sentinel{border:0;background:#000;color:#b6bdcc;
+ padding:4px 0;min-height:10px;line-height:1.2}
+"""
 css.write_text(style)
 print("Shared reader dock + paged mode + colors/fonts + zoomable EPUB illustrations + image-folder layout enabled")
