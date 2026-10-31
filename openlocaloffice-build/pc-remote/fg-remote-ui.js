@@ -24,24 +24,35 @@ function showRemoteConfig(){
  text.type='url';text.inputMode='url';
  text.placeholder='https://your-private-pc-tunnel.example';
  text.value=endpoint();text.setAttribute('aria-label','Secure remote PC endpoint');
- const save=el('button','fg-pc-action','Save remote address');
+ const secret=el('input','fg-pc-token');
+ secret.type='password';secret.autocomplete='off';
+ secret.placeholder='One-time PC authorization (only if not connected)';
+ secret.setAttribute('aria-label','PC authorization key');
+ secret.hidden=Boolean(bridge()?.getRemoteToken?.());
+ const save=el('button','fg-pc-action','Save PC connection');
  const result=el('div','fg-pc-config-status','');
  save.onclick=()=>{
    const value=text.value.trim().replace(/\/+$/,'');
    if(!/^https:\/\/[^\s/#?]+(?::\d+)?$/.test(value)){
      result.textContent='Use an HTTPS address for the private PC relay.';return;
    }
+   if(!secret.hidden && secret.value.trim()){
+     bridge()?.setRemoteToken?.(secret.value.trim());
+     secret.value='';
+   }
    if(bridge()?.setRemoteEndpoint?.(value)){
-     result.textContent='Remote address saved for future sessions.';
+     result.textContent='Encrypted remote connection saved for future sessions.';
      wrapper.remove();
    }else result.textContent='Remote address was rejected.';
  };
- wrapper.append(text,save,result);
+ wrapper.append(text);
+ if(!secret.hidden)wrapper.append(secret);
+ wrapper.append(save,result);
  return wrapper;
 }
 const token=()=>String(bridge()?.getRemoteToken?.()||'').trim();
 async function api(path,opts={}){
-  const auth=token();if(!auth)throw Error('PC USB connection is not configured. Connect the paired PC.');
+  const auth=token();if(!auth)throw Error('PC authorization is not configured. Open Remote settings once.');
   const resp=await fetch(URL_ROOT()+path,{...opts,headers:{...(opts.headers||{}),'X-FG-Token':auth},cache:'no-store'});
   if(!resp.ok){
     let details='';try{details=(await resp.json()).error||''}catch(_){}
