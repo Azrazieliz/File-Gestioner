@@ -339,6 +339,7 @@ function renderImageFolder(data){
  view.classList.toggle('fg-image-paged',imageMode==='pages');
  setPosition(0);appendBatch();
  if(selectedIndex>=0)requestAnimationFrame(()=>jumpTo(selectedIndex));
+ window.FileGestionerLibrary?.imageReaderReady?.();
  window.addEventListener('resize',refreshRotation,{passive:true,once:true});
 }
 const upstream=window.loadDocument;
