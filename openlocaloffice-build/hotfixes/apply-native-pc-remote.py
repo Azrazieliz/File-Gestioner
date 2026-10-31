@@ -105,9 +105,27 @@ s=s.replace(anchor,method+anchor)
 field='    private volatile Uri libraryTree;'
 assert s.count(field)==1
 s=s.replace(field,'    private volatile Uri fgVerifiedKoikatsuCard;\n'+field,1)
-signature='boolean character="png".equals(quickType)&&KoikatsuCards.isCharacterCard(this,uri);'
+signature='boolean character=false; // Nonblocking: show image before validating Koikatsu payload'
 assert s.count(signature)==1
-s=s.replace(signature,signature+'\n                    fgVerifiedKoikatsuCard=character?uri:null;',1)
+s=s.replace(signature,signature+'''
+                    fgVerifiedKoikatsuCard=null;
+                    if("png".equals(quickType)||name.toLowerCase(java.util.Locale.ROOT).endsWith(".png"))
+                        verifyKoikatsuInBackground(uri,imageStreamToken);''',1)
+# The image must be displayed first; only the verified card gains 3D controls.
+field2='    private volatile Uri fgVerifiedKoikatsuCard;'
+assert s.count(field2)==1
+s=s.replace(field2,field2+'''
+    private void verifyKoikatsuInBackground(Uri uri,String token){
+        io.execute(()->{
+            boolean verified=KoikatsuCards.isCharacterCard(this,uri);
+            if(!token.equals(imageStreamToken)||!uri.equals(currentUri))return;
+            fgVerifiedKoikatsuCard=verified?uri:null;
+            final boolean ok=verified;
+            runOnUiThread(()->js("window.FileGestionerFolder?.koikatsuCard("+ok+")"));
+            android.util.Log.i("FG_IMAGE","KOIKATSU_CHECK_DONE verified="+ok);
+        });
+    }
+''',1)
 main.write_text(s)
 js=root/"assets/universal-reader.js"
 s=js.read_text()
