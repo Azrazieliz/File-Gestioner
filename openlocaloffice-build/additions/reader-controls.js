@@ -305,7 +305,10 @@ function renderImageFolder(data){
    pages.push(...incoming);
    if(selectedIndex<0){
      const found=incoming.findIndex(p=>p?.selected);
-     if(found>=0)selectedIndex=from+found;
+     if(found>=0){
+       selectedIndex=from+found;
+       requestAnimationFrame(()=>jumpTo(selectedIndex));
+     }
    }
    if(index<pages.length&&
      (index===0||sentinel.getBoundingClientRect().top<
