@@ -59,4 +59,16 @@ def normalize(path):
           "pixel_stream_bytes:",len(scanlines))
 
 for filename in ("ic_launcher.png","ic_launcher_round.png"):
-    normalize(ROOT/filename)
+    path=ROOT/filename
+    adaptive=Path("app/src/main/res/mipmap-anydpi-v26")/(path.stem+".xml")
+    if not adaptive.is_file():
+        raise FileNotFoundError("Approved adaptive launcher resource missing: "+str(adaptive))
+    try:
+        normalize(path)
+    except (ValueError,zlib.error) as error:
+        # The old branding PNG is truncated (IDAT length exceeds the bytes
+        # in the file) and crashes AAPT2. Keep the existing approved adaptive
+        # vector icon, which targets all supported modern Android devices.
+        path.unlink()
+        print("Invalid legacy raster excluded; preserving approved adaptive icon:",
+              path.name,str(error))
