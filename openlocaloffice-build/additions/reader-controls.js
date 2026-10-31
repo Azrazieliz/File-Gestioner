@@ -270,13 +270,21 @@ function renderImageFolder(data){
    requestAnimationFrame(()=>jumpTo(current));
  }
  function updateCurrent(){
+   const rect=view.getBoundingClientRect();
+   const x=Math.max(1,Math.min(window.innerWidth-2,rect.left+rect.width/2));
+   const y=Math.max(1,Math.min(window.innerHeight-2,rect.top+rect.height*.4));
+   const visible=document.elementFromPoint(x,y)?.closest?.('.fg-folder-page');
+   if(visible?.dataset?.page){
+     setPosition(Number(visible.dataset.page)-1);return;
+   }
+   // On very large collections, never measure every offscreen image on scroll.
    const sections=pageSections();
    if(!sections.length)return;
-   const focus=view.getBoundingClientRect().top+(imageMode==='pages'?.48:.28)*view.clientHeight;
-   let best=0,bestDistance=Infinity;
-   for(let i=0;i<sections.length;i++){
+   const start=Math.max(0,current-50),end=Math.min(sections.length,start+100);
+   let best=current,bestDistance=Infinity;
+   for(let i=start;i<end;i++){
      const r=sections[i].getBoundingClientRect();
-     const d=focus<r.top?r.top-focus:focus>r.bottom?focus-r.bottom:0;
+     const d=y<r.top?r.top-y:y>r.bottom?y-r.bottom:0;
      if(d<bestDistance){bestDistance=d;best=i;if(!d)break;}
    }
    setPosition(best);
