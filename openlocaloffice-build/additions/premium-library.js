@@ -254,9 +254,9 @@ function showFileActions(item){
  }
  if(!item.folder){
    const lower=item.name.toLowerCase();
-   const image=/\\.(png|jpe?g|bmp|webp)$/.test(lower);
-   const firstPdf=/\\.pdf$/.test(lower);
-   const separated=/\\.(csv|tsv)$/.test(lower);
+   const image=/\.(png|jpe?g|bmp|webp)$/.test(lower);
+   const firstPdf=/\.pdf$/.test(lower);
+   const separated=/\.(csv|tsv)$/.test(lower);
    if(image||firstPdf||separated)
      fileAction(sheet,'Convert format','Save as a new file; the original is unchanged',()=>{
        const choose=fileSheet('Convert '+item.name,'Select a supported output. Your original is preserved.');
